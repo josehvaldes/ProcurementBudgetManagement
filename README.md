@@ -68,12 +68,44 @@ This project uses a **choreography pattern** where agents independently react to
 - Cost tracking per agent
 - Production monitoring and alerts
 
+### OCR and Image Processing
+
+**Azure Document Intelligence**
+- Analysis of PDF invoices (prebuilt Invoice model)
+- Analysis of photo receipts: JPG, PNG formats (prebuilt Receipt model)
+- Scanning POS receipts (printed and handwritten)
+- Extracts key fields: vendor, date, amount, line items, tax, etc.
+- Handles various document qualities and formats
+
+**pyzbar for QR Scanning**
+- Scan QR codes from receipts
+- Extract URL to validate receipts against vendor systems
+- Pre-processing step before or after Document Intelligence extraction
+
+### Email Integration
+
+**Azure Logic Apps**
+- Monitors Outlook.com / Office 365 inbox
+- Triggers on new email arrival with attachments
+- Filters emails based on subject, sender, attachment type
+- Extracts invoice attachments (PDF, JPG, PNG)
+- Calls unified API endpoint with invoice data
+
+**Microsoft Graph API**
+- Provides email access via OAuth 2.0
+- Enables programmatic inbox monitoring
+- Supports Outlook.com and Office 365 accounts
+- Managed Identity authentication for security
+
 ## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              INPUT CONNECTORS                           │
-│  • Email Listener (monitors inbox)                      │
+│  • Email Listener (Azure Logic Apps + Graph API)       │
+│    - Monitors Outlook.com inbox                         │
+│    - Extracts attachments (PDF, JPG, PNG)              │
+│    - Calls unified API endpoint                         │
 │  • Web Form (manual upload interface)                   │
 │  • Direct API (external system integration)             │
 └──────────────────────┬──────────────────────────────────┘
@@ -157,3 +189,22 @@ This project uses a **choreography pattern** where agents independently react to
 │  (Runs in parallel, doesn't block main flow)            │
 └─────────────────────────────────────────────────────────┘
 ```
+
+## Invoice State Machine
+
+```
+CREATED → EXTRACTED → VALIDATED → BUDGET_CHECKED → APPROVED → PAYMENT_SCHEDULED → PAID
+
+                                    ↓ (at any stage)
+                                  FAILED / MANUAL_REVIEW
+```
+
+### Valid State Transitions
+
+- CREATED → EXTRACTED, FAILED
+- EXTRACTED → VALIDATED, FAILED
+- VALIDATED → BUDGET_CHECKED, FAILED
+- BUDGET_CHECKED → APPROVED, MANUAL_REVIEW, FAILED
+- APPROVED → PAYMENT_SCHEDULED, FAILED
+- PAYMENT_SCHEDULED → PAID, FAILED
+- MANUAL_REVIEW → (any previous state after human intervention)
