@@ -16,7 +16,7 @@ A company's procurement/purchasing department makes regular purchases (office su
 
 This project uses a **choreography pattern** where agents independently react to state changes without central orchestration. Each agent:
 
-- Subscribes to specific invoice state events
+- Subscribes to specific invoice state messages via Azure Service Bus
 - Processes invoices when their trigger state is detected
 - Updates the invoice state, triggering the next agent
 - Operates independently with no knowledge of other agents
@@ -26,22 +26,24 @@ This project uses a **choreography pattern** where agents independently react to
 - **High decoupling** - agents are independent services
 - **Easy scalability** - each agent can scale independently
 - **Fault isolation** - one agent failure doesn't cascade
-- **Simple extension** - new agents can be added by subscribing to events
+- **Simple extension** - new agents can be added by subscribing to messages
+- **Local development** - agents can run on local machines while connected to cloud Service Bus
 
 ## Technology Stack
 
 ### Core Infrastructure
 
-**Azure Event Grid**
-- Publishes state change events (invoice.created, invoice.extracted, etc.)
-- Agents subscribe to relevant event types
-- Handles event delivery, retries, and dead-lettering
-- Built-in durability and at-least-once delivery
+**Azure Service Bus (Topic/Subscription Pattern)**
+- Single Topic: "invoice-events" for all state change messages
+- Each agent has its own Subscription with SQL filters
+- Messages have subject property (invoice.created, invoice.extracted, etc.)
+- Built-in durability, retry logic, and dead-letter queues
+- Pull-based model: agents fetch messages at their own pace
+- Supports local development without deployment
 
 **Azure Storage Account (Tables)**
 - Invoice data and metadata
 - Vendor information
-- Purchase orders
 - Budget allocations
 - Audit trails
 - Cost-effective for high-volume transactions
@@ -108,79 +110,122 @@ This project uses a **choreography pattern** where agents independently react to
 │    - Calls unified API endpoint                         │
 │  • Web Form (manual upload interface)                   │
 │  • Direct API (external system integration)             │
-└──────────────────────┬──────────────────────────────────┘
-                       ↓
+└──────────────────┬──────────────────────────────────────┘
+                   ↓
 ┌─────────────────────────────────────────────────────────┐
 │              UNIFIED API ENDPOINT                       │
 │  • Authenticate request                                 │
 │  • Validate payload                                     │
 │  • Store raw invoice in Azure Tables                    │
 │  • Set state = CREATED                                  │
-│  • Publish "invoice.created" to Azure Event Grid        │
+│  • Publish message to Service Bus Topic                 │
 │  • Return 202 Accepted                                  │
 └─────────────────────────────────────────────────────────┘
                        ↓
-              [Azure Event Grid]
-                       ↓
-        ┌──────────────┴──────────────┐
-        ↓                             ↓
-┌──────────────────┐          ┌──────────────────┐
-│  INTAKE AGENT    │          │  Other Agents    │
-│  Subscribes to:  │          │  (listening but  │
-│  invoice.created │          │   not reacting)  │
-└────────┬─────────┘          └──────────────────┘
-         ↓
-    Processes invoice
-    Extracts data
-    Updates state → EXTRACTED
-    Publishes "invoice.extracted"
-         ↓
+┌─────────────────────────────────────────────────────────┐
+│         AZURE SERVICE BUS NAMESPACE                     │
+│                                                         │
+│   ┌─────────────────────────────────────────────┐     │
+│   │  Topic: "invoice-events"                    │     │
+│   │                                             │     │
+│   │  Messages by Subject:                       │     │
+│   │  • invoice.created                          │     │
+│   │  • invoice.extracted                        │     │
+│   │  • invoice.validated                        │     │
+│   │  • invoice.budget_checked                   │     │
+│   │  • invoice.approved                         │     │
+│   │  • invoice.payment_scheduled                │     │
+│   │  • invoice.paid                             │     │
+│   │  • invoice.failed                           │     │
+│   └──────────┬──────────────────────────────────┘     │
+│              │                                      │
+│     ┌────────────┼────────────┬──────────┬─────────  │
+│     ↓            ↓            ↓          ↓         ↓  │
+│  ┌──────┐    ┌──────┐    ┌──────┐   ┌──────┐  ┌────┤│
+│  │ Sub: │    │ Sub: │    │ Sub: │   │ Sub: │  │Sub:││
+│  │intake│    │valid │    │budget│   │approv│  │etc ││
+│  │      │    │      │    │      │   │      │  │    ││
+│  │SQL:  │    │SQL:  │    │SQL:  │   │SQL:  │  │SQL:││
+│  │subj= │    │subj= │    │subj= │   │subj= │  │all ││
+│  │created    │extrac│    │valid │   │budget│  │    ││
+│  └──────┘    └──────┘    └──────┘   └──────┘  └────┘│
+└─────────────────────────────────────────────────────────┘
+     ↓            ↓            ↓          ↓         ↓
+┌─────────┐  ┌─────────┐  ┌─────────┐ ┌─────────┐ ┌────────┐
+│ INTAKE  │  │VALIDATN │  │ BUDGET  │ │APPROVAL │ │ANALYTICS│
+│ AGENT   │  │ AGENT   │  │ AGENT   │ │ AGENT   │ │ AGENT  │
+│         │  │         │  │         │ │         │ │        │
+│(local   │  │(local   │  │(local   │ │(local   │ │(local  │
+│ or      │  │ or      │  │ or      │ │ or      │ │ or     │
+│ cloud)  │  │ cloud)  │  │ cloud)  │ │ cloud)  │ │ cloud) │
+└─────────┘  └─────────┘  └─────────┘ └─────────┘ └────────┘
+```
+
+### Detailed Agent Flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              INTAKE AGENT                               │
+│  Subscription: intake-agent-subscription                │
+│  Filter: subject = 'invoice.created'                    │
+│  • Pull messages from subscription                      │
+│  • Extract data using Document Intelligence             │
+│  • Identify vendor                                      │
+│  • Update state → EXTRACTED                             │
+│  • Publish message: subject='invoice.extracted'         │
+└──────────────────┬──────────────────────────────────────┘
+                   ↓
 ┌─────────────────────────────────────────────────────────┐
 │              VALIDATION AGENT                           │
-│  Subscribes to: invoice.extracted                       │
+│  Subscription: validation-agent-subscription            │
+│  Filter: subject = 'invoice.extracted'                  │
 │  • Verify against approved vendor list                  │
 │  • Check spending authority limits                      │
 │  • Validate pricing (compare to catalog)                │
 │  • Flag duplicate invoices                              │
 │  • Check contract compliance                            │
-│  Updates state → VALIDATED                              │
-│  Publishes "invoice.validated"                          │
-└──────────────────────┬──────────────────────────────────┘
-                       ↓
+│  • Update state → VALIDATED                             │
+│  • Publish message: subject='invoice.validated'         │
+└──────────────────┬──────────────────────────────────────┘
+                   ↓
 ┌─────────────────────────────────────────────────────────┐
 │              BUDGET TRACKING AGENT                      │
-│  Subscribes to: invoice.validated                       │
+│  Subscription: budget-agent-subscription                │
+│  Filter: subject = 'invoice.validated'                  │
 │  • Allocate to department/project budget                │
 │  • Check remaining budget availability                  │
 │  • Calculate % budget consumed                          │
 │  • Flag over-budget scenarios                           │
-│  Updates state → BUDGET_CHECKED                         │
-│  Publishes "invoice.budget_checked"                     │
-└──────────────────────┬──────────────────────────────────┘
-                       ↓
+│  • Update state → BUDGET_CHECKED                        │
+│  • Publish message: subject='invoice.budget_checked'    │
+└──────────────────┬──────────────────────────────────────┘
+                   ↓
 ┌─────────────────────────────────────────────────────────┐
 │              APPROVAL AGENT                             │
-│  Subscribes to: invoice.budget_checked                  │
+│  Subscription: approval-agent-subscription              │
+│  Filter: subject = 'invoice.budget_checked'             │
 │  • Auto-approve if within policy                        │
 │  • Route to dept manager if needed                      │
 │  • Escalate if over budget                              │
-│  Updates state → APPROVED                               │
-│  Publishes "invoice.approved"                           │
-└──────────────────────┬──────────────────────────────────┘
-                       ↓
+│  • Update state → APPROVED                              │
+│  • Publish message: subject='invoice.approved'          │
+└──────────────────┬──────────────────────────────────────┘
+                   ↓
 ┌─────────────────────────────────────────────────────────┐
 │              PAYMENT AGENT                              │
-│  Subscribes to: invoice.approved                        │
+│  Subscription: payment-agent-subscription               │
+│  Filter: subject = 'invoice.approved'                   │
 │  • Schedule payment (net-30, net-60)                    │
 │  • Generate payment batch                               │
 │  • Send remittance to vendor                            │
-│  Updates state → PAYMENT_SCHEDULED                      │
-│  Publishes "invoice.payment_scheduled"                  │
-└──────────────────────┬──────────────────────────────────┘
-                       ↓
+│  • Update state → PAYMENT_SCHEDULED                     │
+│  • Publish message: subject='invoice.payment_scheduled' │
+└──────────────────┬──────────────────────────────────────┘
+                   ↓
 ┌─────────────────────────────────────────────────────────┐
 │              ANALYTICS AGENT                            │
-│  Subscribes to: invoice.* (all events)                  │
+│  Subscription: analytics-agent-subscription             │
+│  Filter: (no filter - receives ALL messages)            │
 │  • Compare spending vs. last month/year                 │
 │  • Identify spending trends                             │
 │  • Flag anomalies (sudden spikes)                       │

@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Invoice Lifecycle API
+  api:
+    build:
+      context: ./invoice-lifecycle-api
+      dockerfile: Dockerfile
+    container_name: invoice-api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./invoice-lifecycle-api:/app
+      - ./shared:/app/shared
+    networks:
+      - procurement-network
+    restart: unless-stopped
+
+  # Invoice Lifecycle UI
+  ui:
+    build:
+      context: ./invoice-lifecycle-ui
+      dockerfile: Dockerfile
+    container_name: invoice-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    networks:
+      - procurement-network
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Agent Runner (runs all agents in one container for development)
+  agents:
+    build:
+      context: .
+      dockerfile: Dockerfile.agents
+    container_name: invoice-agents
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    env_file:
+      - .env
+    volumes:
+      - ./agents:/app/agents
+      - ./shared:/app/shared
+    networks:
+      - procurement-network
+    depends_on:
+      - api
+    restart: unless-stopped
+
+networks:
+  procurement-network:
+    driver: bridge
