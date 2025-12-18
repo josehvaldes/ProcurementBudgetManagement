@@ -6,7 +6,9 @@ import os
 from functools import lru_cache
 from typing import Optional
 from pydantic_settings import BaseSettings
-
+from dotenv import find_dotenv
+# Find .env file automatically
+ENV_FILE = find_dotenv(usecwd=True) or ".env"
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -29,8 +31,7 @@ class Settings(BaseSettings):
     
     # Azure Document Intelligence
     document_intelligence_endpoint: str = ""
-    document_intelligence_api_key: str = ""
-    
+        
     # Azure Blob Storage (for document storage)
     blob_storage_connection_string: str = ""
     blob_container_name: str = "invoice-documents"

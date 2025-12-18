@@ -5,8 +5,11 @@ from azure.servicebus import ServiceBusMessage, ServiceBusSender
 from azure.servicebus.aio import ServiceBusClient
 from azure.identity.aio import DefaultAzureCredential
 
-FULLY_QUALIFIED_NAMESPACE = os.environ["SERVICE_BUS_CONNECTION_STRING"]
-TOPIC_NAME = os.environ["SERVICE_BUS_TOPIC_NAME"]
+from shared.config.settings import get_settings
+settings = get_settings()
+
+FULLY_QUALIFIED_NAMESPACE = settings.service_bus_connection_string
+TOPIC_NAME = settings.service_bus_topic_name
 SUBSCRIPTION_NAME = "intake-agent-subscription" #os.environ["SERVICEBUS_SUBSCRIPTION_NAME"]
 credential = DefaultAzureCredential()
 
