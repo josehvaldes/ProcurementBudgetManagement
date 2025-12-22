@@ -8,7 +8,7 @@ from azure.identity.aio import DefaultAzureCredential
 from shared.config.settings import get_settings
 settings = get_settings()
 
-FULLY_QUALIFIED_NAMESPACE = settings.service_bus_connection_string
+FULLY_QUALIFIED_NAMESPACE = settings.service_bus_host_name
 TOPIC_NAME = settings.service_bus_topic_name
 SUBSCRIPTION_NAME = "intake-agent-subscription" #os.environ["SERVICEBUS_SUBSCRIPTION_NAME"]
 credential = DefaultAzureCredential()
@@ -31,7 +31,7 @@ async def send_single_message(sender:ServiceBusSender):
         print(f"Error occurred while sending single message: {e}")
 
 
-async def main_send():
+async def send():
     servicebus_client = ServiceBusClient(FULLY_QUALIFIED_NAMESPACE, credential, logging_enable=True)
 
     async with servicebus_client:
@@ -48,7 +48,7 @@ async def main_send():
     print("\nDemonstrating concurrent sending with shared client and locks...")
     #await send_concurrent_with_shared_client_and_lock()
 
-async def main_receive():
+async def receive():
     
     servicebus_client = ServiceBusClient(FULLY_QUALIFIED_NAMESPACE, credential)
 
@@ -68,10 +68,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Service Bus Client Test Scenarios")
     parser.add_argument("action", type=str, help="Action to perform: send or receive", choices=["send", "receive"])
     args = parser.parse_args()
-    if args.action == "send":
-        print("Send action selected.")
-        asyncio.run(main_send())
-    elif args.action == "receive":
-        print("Receive action selected")
-        asyncio.run(main_receive())
-    
+
+    test_map = {
+        "send": send,
+        "receive": receive,
+    }
+
+    test_method = test_map.get(args.action)
+    if test_method:
+        print(f"{args.action.capitalize()} action selected.")
+        asyncio.run(test_method())

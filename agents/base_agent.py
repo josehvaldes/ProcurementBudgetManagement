@@ -65,7 +65,7 @@ class BaseAgent(ABC):
         
         try:
             with ServiceBusClient(
-                self.settings.service_bus_connection_string,
+                self.settings.service_bus_host_name,
                 self.settings.service_bus_topic_name
             ) as sb_client:
                 self.service_bus_client = sb_client

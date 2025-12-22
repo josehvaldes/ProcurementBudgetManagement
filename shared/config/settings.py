@@ -2,11 +2,12 @@
 Application settings and configuration.
 """
 
-import os
 from functools import lru_cache
 from typing import Optional
 from pydantic_settings import BaseSettings
 from dotenv import find_dotenv
+from pydantic import ConfigDict
+
 # Find .env file automatically
 ENV_FILE = find_dotenv(usecwd=True) or ".env"
 
@@ -14,17 +15,25 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
     # Application
-    app_name: str = "Procurement & Budget Management"
+    api_title: str = "Procurement & Budget Management"
+    api_description: str = "AI-Powered Product Knowledge & Support Agent"
+    api_version: str = "2.0"
     environment: str = "development"
-    debug: bool = True
+    debug: bool = False
+
+    #Logging Configuration
     log_level: str = "INFO"
+    log_file: str = "logs/invoice-lifecycle.log"
+    log_to_console: bool = True
+
+    repository_type: str = "azure_table_storage"  # Options: in_memory, azure_table_storage
     
     # Azure Service Bus
-    service_bus_connection_string: str = ""
+    service_bus_host_name: str = "<your-service-bus-host-name>.servicebus.windows.net"
     service_bus_topic_name: str = "invoice-events"
     
     # Azure Storage (Tables)
-    storage_connection_string: str = ""
+    azure_storage_account_url: str = ""
     invoices_table_name: str = "invoices"
     vendors_table_name: str = "vendors"
     budgets_table_name: str = "budgets"
@@ -33,8 +42,8 @@ class Settings(BaseSettings):
     document_intelligence_endpoint: str = ""
         
     # Azure Blob Storage (for document storage)
-    blob_storage_connection_string: str = ""
-    blob_container_name: str = "invoice-documents"
+    blob_storage_account_url: str = ""
+    blob_container_name: str = "invoice"
     
     # LangChain / LLM
     openai_api_key: Optional[str] = None
@@ -62,10 +71,13 @@ class Settings(BaseSettings):
     require_po_match: bool = True
     require_budget_check: bool = True
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = ConfigDict(
+        str_max_length=200,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+        )
 
 
 @lru_cache()
@@ -77,3 +89,5 @@ def get_settings() -> Settings:
         Settings instance
     """
     return Settings()
+
+settings = get_settings()

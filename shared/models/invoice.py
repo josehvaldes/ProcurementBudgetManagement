@@ -2,13 +2,12 @@
 Invoice domain model and state machine.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
-import json
-
+from shared.utils.convert import convert_to_table_entity
 
 class InvoiceState(str, Enum):
     """Invoice state machine states."""
@@ -47,7 +46,6 @@ class LineItem:
     total: Decimal
     category: Optional[str] = None
 
-
 @dataclass
 class Invoice:
     """Invoice domain model aligned with Azure Table Storage schema."""
@@ -81,9 +79,12 @@ class Invoice:
     
     # ========== DOCUMENT & EXTRACTION ==========
     description: Optional[str] = None
-    raw_data: Optional[str] = None  # JSON - Original file data
     raw_file_url: Optional[str] = None  # Azure Blob Storage URL
+    raw_file_blob_name: Optional[str] = None  # Blob name for original file
+    file_name: Optional[str] = None
     file_type: Optional[str] = None  # pdf, jpg, png
+    file_size: Optional[int] = None  # in bytes
+    file_uploaded_at: Optional[datetime] = None
     extracted_data: Optional[Dict[str, Any]] = None  # Parsed OCR data
     extraction_confidence: Optional[float] = None  # 0-1
     qr_code_data: Optional[str] = None
@@ -92,9 +93,9 @@ class Invoice:
     line_items: List[LineItem] = field(default_factory=list)
     
     # ========== PURCHASE ORDER MATCHING ==========
-    has_po: bool
+    has_po: Optional[bool]  = False
     po_number: Optional[str] = None
-    po_matched: bool = False
+    po_matched: Optional[bool]  = False
     po_match_confidence: Optional[float] = None
     
     # ========== BUDGET TRACKING ==========
@@ -151,4 +152,12 @@ class Invoice:
                 f"Invalid state transition from {self.state} to {new_state}"
             )
         self.state = new_state
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
+
+   
+    def to_dict(self) -> dict:
+        """Convert Invoice dataclass to dictionary."""
+        result = asdict(self)
+        result['line_items'] = [asdict(item) for item in self.line_items]
+        result = convert_to_table_entity(result)
+        return result

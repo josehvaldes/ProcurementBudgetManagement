@@ -87,9 +87,11 @@ INVOICES_SCHEMA = {
     "state_changed_by": "Optional[str]", # Agent or user who changed state
     
     # ========== EXTRACTED DATA (from Document Intelligence) ==========
-    "raw_data": "str",                 # JSON - Original file data (base64 encoded)
     "raw_file_url": "Optional[str]",   # Azure Blob Storage URL for original file
+    "raw_file_blob_name": "Optional[str]", # Blob name for original file
     "file_type": "Optional[str]",      # File extension (pdf, jpg, png)
+    "file_size": "Optional[int]",      # in bytes
+    "file_uploaded_at": "Optional[datetime]", # When file was uploaded
     "extracted_data": "Optional[str]", # JSON - Parsed fields from OCR
     "extraction_confidence": "Optional[float]", # OCR confidence score (0-1)
     "qr_code_data": "Optional[str]",   # QR code data if present

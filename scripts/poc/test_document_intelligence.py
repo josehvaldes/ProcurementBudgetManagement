@@ -4,9 +4,16 @@ from azure.identity.aio import DefaultAzureCredential
 from azure.ai.documentintelligence.aio import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentAnalysisFeature
 import os
-from shared.config.settings import get_settings
-settings = get_settings()
+from shared.config.settings import settings
+from shared.utils.logging_config import get_logger, setup_logging
 
+setup_logging(
+        log_level=settings.log_level,
+        log_file=settings.log_file,
+        log_to_console=settings.log_to_console
+    )
+
+logger = get_logger(__name__)
 endpoint = settings.document_intelligence_endpoint
 
 async def analyze_receipt_request(image_path:str, locale:str= "en-US"):
@@ -165,18 +172,20 @@ async def run_invoce_tests():
     print(response)
 
 async def run_receipt_tests():
-    #print("Analyzing a standard receipt document...")
-    #image_path ="./scripts/poc/sample_documents/receipts/VALDES_251216_image.jpg"
-    #asyncio.run(analyze_receipt_request(image_path))
+    print("Analyzing a standard receipt document...")
+    image_path ="./scripts/poc/sample_documents/receipts/VALDES_251216_image.jpg"
+    response = await analyze_receipt_request(image_path)
+    print(response)
+    
+    print("\nAnalyzing a low-quality receipt document...")
+    image_path_low_q = "./scripts/poc/sample_documents/receipts/20251216_152628_low_q.jpg"
+    response = await analyze_receipt_request(image_path_low_q)
+    print(response)
 
-    #print("\nAnalyzing a low-quality receipt document...")
-    #image_path_low_q = "./scripts/poc/sample_documents/receipts/20251216_152628_low_q.jpg"
-    #asyncio.run(analyze_receipt_request(image_path_low_q))
-
-    # print("\nAnalyzing a blurry receipt document...")
-    # image_path_blurry = "./scripts/poc/sample_documents/receipts/20251217_213140_blurry.jpg"
-    # response = await analyze_receipt_request(image_path_blurry, locale="es-ES")
-    # print(response)
+    print("\nAnalyzing a blurry receipt document...")
+    image_path_blurry = "./scripts/poc/sample_documents/receipts/20251217_213140_blurry.jpg"
+    response = await analyze_receipt_request(image_path_blurry, locale="es-ES")
+    print(response)
 
     print("\nAnalyzing a moved-angle receipt document...")
     image_path_moved = "./scripts/poc/sample_documents/receipts/20251217_213133_moved_angle.jpg"
@@ -187,8 +196,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Document Intelligence Client Test")
     parser.add_argument("action", type=str, help="Action to perform: invoice or receipt", choices=["invoice", "receipt"])
     args = parser.parse_args()
-    if args.action == "invoice":
-        asyncio.run(run_invoce_tests())
-    elif args.action == "receipt":
-        asyncio.run(run_receipt_tests())
+
+    test_map = {
+        "invoice": run_invoce_tests,
+        "receipt": run_receipt_tests,
+    }
+    test_method = test_map.get(args.action)
+    if test_method:
+        asyncio.run(test_method())
+
 

@@ -1,6 +1,6 @@
 from decimal import Decimal
 from azure.identity.aio import DefaultAzureCredential
-from shared.infrastructure.document_intelligence_client import DocumentIntelligenceWrapper
+from shared.infrastructure.document_intelligence_wrapper import DocumentIntelligenceWrapper
 
 
 from shared.config.settings import get_settings
