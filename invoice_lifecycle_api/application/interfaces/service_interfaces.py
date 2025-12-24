@@ -2,26 +2,25 @@
 Product service interface for dependency injection.
 """
 from abc import ABC, abstractmethod
-from typing import List, Dict, Generator
-from datetime import datetime
-
-from shared.models.invoice import Invoice
+import asyncio
+from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
 
 class TableServiceInterface(ABC):
     """Abstract base class for product service implementations."""
+
     @abstractmethod
-    async def save_invoice(self, invoice_data: Invoice) -> str:
-        """Save invoice data to the repository."""
+    async def upsert_entity(self, entity, partition_key: str, row_key: str) -> str:
+        """Upsert an entity in the table storage."""
         pass
 
     @abstractmethod
-    async def get_invoice(self, invoice_id: str) -> Invoice | None:
-        """Retrieve invoice by ID."""
+    async def get_entity(self, partition_key: str, row_key: str) -> dict | None:
+        """Retrieve entity by ID."""
         pass
 
     @abstractmethod
-    async def delete_invoice(self, invoice_id: str) -> None:
-        """Delete invoice by ID."""
+    async def delete_entity(self, partition_key: str, row_key: str) -> None:
+        """Delete entity by ID."""
         pass
 
     @abstractmethod
@@ -66,12 +65,16 @@ class MessagingServiceInterface(ABC):
     """Abstract base class for messaging service implementations."""
     
     @abstractmethod
-    async def send_message(self, topic: str, message_data: Dict) -> None:
+    async def publish_message(self, topic: str, message_data: dict) -> None:
         """Send a message to the specified topic."""
+        pass
+    
+    @abstractmethod
+    def get_subscription_receiver(self, subscription: str, shutdown_event: asyncio.Event) -> SubscriptionReceiverWrapper:
+        """Get a receiver for the specified subscription."""
         pass
 
     @abstractmethod
     async def close(self) -> None:
         """Close any resources held by the service."""
         pass
-    

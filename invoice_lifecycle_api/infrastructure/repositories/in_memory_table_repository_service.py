@@ -9,12 +9,12 @@ class InMemoryTableRepositoryService(TableServiceInterface):
     def __init__(self):
         self._invoices = {}
 
-    def save_invoice(self, invoice: Invoice) -> str:
+    def save_entity(self, invoice: Invoice) -> str:
         self._invoices[invoice.invoice_id] = invoice
         return invoice.invoice_id
 
-    def get_invoice(self, invoice_id: str) -> Invoice | None:
+    def get_entity(self, invoice_id: str) -> Invoice | None:
         return self._invoices.get(invoice_id)
 
-    def delete_invoice(self, invoice_id: str) -> None:
+    def delete_entity(self, invoice_id: str) -> None:
         self._invoices.pop(invoice_id, None)

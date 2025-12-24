@@ -46,14 +46,13 @@ class EventChoreographer:
             logger.info(f"Invoice ID: {invoice_id} Uploaded to blob URL: {blob_url}")
 
             #step 2 - save invoice metadata to table storage
-            id = await self.table_repository.save_invoice(invoice)
+            entity = invoice.to_dict()
+            id = await self.table_repository.upsert_entity(entity, invoice.department_id, invoice.invoice_id)
             logger.info(f"Invoice saved with ID: {id}")
 
-            #step 3 - send notification to ServiceBus topic(TODO)
+            #step 3 - send notification to ServiceBus topic
             data = {
                 "subject": "invoice.created",
-                "content_type": invoice.file_type,
-                "messageId": invoice_id,
                 "body": {
                     "invoice_id": invoice.invoice_id,
                     "event_type": "APIInvoiceUploaded",                    
@@ -61,7 +60,7 @@ class EventChoreographer:
                 }
             }
             logger.info(f"Sending message to Service Bus Topic: {settings.service_bus_topic_name} with Invoice ID: {invoice_id}")
-            await self.messaging_service.send_message(settings.service_bus_topic_name, data)
+            await self.messaging_service.publish_message(settings.service_bus_topic_name, data)
 
             return invoice_id
         except Exception as e:

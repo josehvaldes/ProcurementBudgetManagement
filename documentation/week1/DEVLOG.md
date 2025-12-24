@@ -96,12 +96,12 @@ Building an AI-powered multi-agent system using **event-driven choreography** to
   - [X] Configure ServiceBusClient with connection string
   - [X] Publish test message to "invoice-events" topic
 - **Create first agent listener (Intake Agent)** ⭐
-  - [] Implement Service Bus subscription receiver
-  - Pull messages from intake-agent-subscription
-  - Get invoice metadata from Table Storage
-  - Download file from Blob Storage
-  - Test message filtering (only invoice.created)
-  - Implement complete_message() after processing
+  - [X] Implement Service Bus subscription receiver
+  - [X] Pull messages from intake-agent-subscription
+  - [X] Get invoice metadata from Table Storage
+  - [X] Test message filtering (only invoice.created)
+  - [X] Download file from Blob Storage  
+  - [X] Implement complete_message() after processing
 - Set up LangChain with Azure OpenAI connection
 - Configure LangSmith for agent tracing
 - Integrate Document Intelligence extraction into intake flow

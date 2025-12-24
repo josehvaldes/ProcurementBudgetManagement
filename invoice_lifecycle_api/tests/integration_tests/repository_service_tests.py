@@ -1,17 +1,17 @@
 import argparse
 import asyncio
 from datetime import datetime, timezone
-import base64
+
 import traceback
 import uuid
 
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.models.invoice import Invoice, InvoiceSource
-from invoice_lifecycle_api.application.interfaces.service_interfaces import MessagingServiceInterface, StorageServiceInterface, TableServiceInterface
+from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
-from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
+from invoice_lifecycle_api.application.interfaces.service_interfaces import StorageServiceInterface, TableServiceInterface
 
 setup_logging(
         log_level=settings.log_level,
@@ -24,9 +24,9 @@ class RepositoryServiceTests:
     def setup_method(self):
         self.repository: TableServiceInterface = TableStorageService()
         self.blob_repository: StorageServiceInterface = InvoiceStorageService()
-        self.messaging_service: MessagingServiceInterface = ServiceBusMessagingService()
 
-    async def test_save_invoice(self):
+
+    async def test_upsert_entity(self):
         invoice = Invoice(
             invoice_id=uuid.uuid4().hex[:12],
             department_id=f"dept_{uuid.uuid4().hex[:6]}",
@@ -43,8 +43,9 @@ class RepositoryServiceTests:
             line_items=[],
             has_po=False
             )
-        id = await self.repository.save_invoice(invoice)
-        print(f"Saved invoice ID: {id}")
+        entity_dict = invoice.to_dict()
+        id = await self.repository.upsert_entity(entity_dict, invoice.department_id, invoice.invoice_id)
+        print(f"Saved invoice : {entity_dict}")
         assert id is not None
     
     async def test_upload_file_as_bytes(self):
@@ -78,25 +79,27 @@ class RepositoryServiceTests:
         await self.blob_repository.delete_file(blob_name)
         print(f"Deleted blob: {blob_name}")
 
-    async def test_send_message(self):
-        try:
-            message_data = {
-                "subject": "invoice.created",
-                "content_type": "application/json",
-                "messageId": uuid.uuid4().hex[:12],
-                "body": {
-                    "event_type": "APIInvoiceUploaded",                    
-                    "department_id": "dept_test",
-                }
-            }
-            print(f"Sending test message to topic 'invoice-events'")
-            await self.messaging_service.send_message(settings.service_bus_topic_name, message_data)
-            print(f"Sent test message with ID: {message_data['messageId']}")
 
+    async def test_get_entity(self):
+        try:
+            partition_key = "dept_8d6014"
+            row_key = "d7224a169011"
+            print(f"Retrieving entity with Partition Key: {partition_key}, Row Key: {row_key}")
+            entity = await self.repository.get_entity(partition_key, row_key)
+            invoice: Invoice = Invoice.from_dict(entity) if entity else None
+            if invoice:
+                print(f"Retrieved entity: {invoice}")
+            else:
+                print("Entity not found.")
         except Exception as e:
-            print(f"Error sending test message: {e}")
-            print(f"Message data: {message_data}")
+            print(f"Error retrieving entity: {e}")
             traceback.print_exc()
+
+    async def close_repositories(self):
+        await self.repository.close()
+        await self.blob_repository.close()
+        credential_manager = get_credential_manager()
+        await credential_manager.close()
 
 async def main():
     """Main async entry point for running tests."""
@@ -104,26 +107,28 @@ async def main():
     test_instance.setup_method()
 
     parser = argparse.ArgumentParser(description="Azure Storage Repository Service Tests")
-    parser.add_argument("action", type=str, help="Action to perform: Table or Blob", 
-                       choices=["table", "upload", "download", "delete", "send_message"])
+    parser.add_argument("action", type=str, help="Action to perform: upsert, upload, download, delete, get_entity",
+                       choices=["upsert", "upload", "download", "delete", "get_entity"])
     args = parser.parse_args()
     
     logger.info(f"Running test for action: {args.action}")
     
     # Map actions to test methods
     test_map = {
-        "table": test_instance.test_save_invoice,
+        "upsert": test_instance.test_upsert_entity,
         "upload": test_instance.test_upload_file_as_bytes,
         "download": test_instance.test_download_file,
         "delete": test_instance.test_delete_file,
-        "send_message": test_instance.test_send_message,
+        "get_entity": test_instance.test_get_entity,
     }
     
     # Run the selected test
     test_method = test_map.get(args.action)
     if test_method:
         await test_method()
-        
+
+    await test_instance.close_repositories()
+
 if __name__ == "__main__":
     asyncio.run(main())
 

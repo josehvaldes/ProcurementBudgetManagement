@@ -161,3 +161,14 @@ class Invoice:
         result['line_items'] = [asdict(item) for item in self.line_items]
         result = convert_to_table_entity(result)
         return result
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Invoice":
+        """Create Invoice instance from dictionary."""
+        line_items_data = data.get('line_items', [])
+        line_items: List[LineItem] = []
+        print(f"Deserializing line items: {line_items_data}")
+        if line_items_data and len(line_items_data) > 0 and isinstance(line_items_data[0], dict):
+            line_items = [LineItem(**item) for item in line_items_data]
+        data['line_items'] = line_items
+        return Invoice(**data)

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     service_bus_topic_name: str = "invoice-events"
     
     # Azure Storage (Tables)
-    azure_storage_account_url: str = ""
+    table_storage_account_url: str = ""
     invoices_table_name: str = "invoices"
     vendors_table_name: str = "vendors"
     budgets_table_name: str = "budgets"
