@@ -44,12 +44,12 @@ class StorageServiceInterface(ABC):
         pass
 
     @abstractmethod
-    async def download_file(self, blob_name: str) -> bytes | None:
+    async def download_file(self, container_name: str, blob_name: str) -> bytes | None:
         """Download file from storage."""
         pass
 
     @abstractmethod
-    async def delete_file(self, blob_name: str) -> None:
+    async def delete_file(self, container_name: str, blob_name: str) -> None:
         """Delete file from storage."""
         pass
 

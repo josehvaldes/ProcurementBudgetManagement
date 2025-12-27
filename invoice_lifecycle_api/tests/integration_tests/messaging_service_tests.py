@@ -57,9 +57,9 @@ class MessagingServiceTests:
     async def test_send_message(self):
         try:
             invoice_data = {
-                "invoice_id": "d7224a169011",
-                "event_type": "APIInvoiceUploaded",                    
-                "department_id": "dept_8d6014",
+                "invoice_id": "584708294422",
+                "event_type": "TestGenerated",
+                "department_id": "FIN-01",
             }
             message_data = {
                 "subject": "invoice.created",

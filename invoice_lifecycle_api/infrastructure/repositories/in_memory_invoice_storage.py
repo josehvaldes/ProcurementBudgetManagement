@@ -15,14 +15,10 @@ class InMemoryInvoiceStorageService(StorageServiceInterface):
         """Upload file to storage and return the file URL."""
         pass
 
-    async def download_file(self, blob_name: str, download_path: str) -> None:
+    async def download_file(self, container_name: str, blob_name: str, download_path: str) -> None:
         """Download file from storage to the specified path."""
         pass
 
-    async def delete_file(self, blob_name: str) -> None:
+    async def delete_file(self, container_name: str, blob_name: str) -> None:
         """Delete file from storage."""
-        pass
-
-    async def get_sas_url(self, blob_name: str, expiry_hours: int = 1) -> str:
-        """Get a SAS URL for the specified blob."""
         pass

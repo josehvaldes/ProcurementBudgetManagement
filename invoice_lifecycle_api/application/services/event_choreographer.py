@@ -55,7 +55,7 @@ class EventChoreographer:
                 "subject": "invoice.created",
                 "body": {
                     "invoice_id": invoice.invoice_id,
-                    "event_type": "APIInvoiceUploaded",                    
+                    "event_type": "APIInvoiceGenerated",
                     "department_id": invoice.department_id,
                 }
             }

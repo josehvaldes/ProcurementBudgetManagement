@@ -26,6 +26,7 @@ class TableStorageService(TableServiceInterface):
             table_name=self.table_name,
             credential=credential_manager.get_credential()
         )
+        credential_manager.close()
 
     async def upsert_entity(self, entity: dict, partition_key: str, row_key: str) -> str:
         """Save an entity to the Azure Table Storage."""

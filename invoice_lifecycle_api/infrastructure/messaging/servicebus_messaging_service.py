@@ -55,4 +55,4 @@ class ServiceBusMessagingService(MessagingServiceInterface):
         if self.subscribers:
             for subscriber in self.subscribers:
                 await subscriber.close()
-            logger.info("All subscribers closed.")
+            logger.info(f"All {len(self.subscribers)} subscribers closed.")

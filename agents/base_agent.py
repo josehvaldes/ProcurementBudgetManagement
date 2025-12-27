@@ -2,13 +2,16 @@
 Base agent class for invoice processing agents.
 """
 import asyncio
-import signal
+from langsmith import traceable
+from langsmith.run_helpers import get_current_run_tree
+import time
 import json
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
-from azure.servicebus import ServiceBusReceivedMessage, ServiceBusMessage
+from azure.servicebus import ServiceBusReceivedMessage
 from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
 from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
+from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.config.settings import settings
@@ -51,7 +54,6 @@ class BaseAgent(ABC):
         # Initialize clients
         self.service_bus_client: ServiceBusMessagingService = None
         self.table_storage_client: TableStorageService = None
-
         self.initialize_clients()
 
     
@@ -70,6 +72,7 @@ class BaseAgent(ABC):
             host_name=settings.service_bus_host_name,
             topic_name=settings.service_bus_topic_name
         )
+
         self.logger.info(f"{self.agent_name} initialized successfully")
     
     async def close(self) -> None:
@@ -79,7 +82,12 @@ class BaseAgent(ABC):
             await self.table_storage_client.close()
         if self.service_bus_client:
             await self.service_bus_client.close()
-        self.logger.info(f"{self.agent_name} clients closed successfully")
+        
+        await self.release_resources()
+        
+    @abstractmethod
+    async def release_resources(self) -> None:
+        """Release any resources held by the agent."""
 
     async def run(self) -> None:
         """
@@ -94,11 +102,13 @@ class BaseAgent(ABC):
             ) as receiver:
                 self.logger.info(f"{self.agent_name} listening for messages...")
                 async for message in receiver:
-
+                    
                     if self.shutdown_event.is_set():
                         self.logger.info(f"Shutdown event set, stopping {self.agent_name}...")
                         break
-
+                    
+                    run = get_current_run_tree()
+                    start_time = time.time()
                     try:
                         completed = await self._process_message(message)
                         if completed:
@@ -112,8 +122,7 @@ class BaseAgent(ABC):
                             )
 
                     except Exception as e:
-                        self.logger.error(f"Error processing message: {e}", exc_info=True)
-                        self.logger.error(f"Sending to dead-letter Message data: [{message}]")
+                        self.logger.error(f"Sending to dead-letter Message data. Error processing message: {e}", exc_info=True)
 
                         # Dead-letter the message
                         await receiver.dead_letter_message(
@@ -121,9 +130,16 @@ class BaseAgent(ABC):
                             reason="ProcessingError",
                             description=str(e)
                         )
-            self.logger.info(f"{self.agent_name} shut down gracefully")
+                    total_time = time.time() - start_time
+                    run.add_metadata({
+                        "total_latency_ms": total_time * 1000,
+                        "intent": self.agent_name,
+                    })
+
         except asyncio.CancelledError:
             self.logger.info(f"{self.agent_name} cancelled")
+        except StopAsyncIteration:
+            self.logger.warning("No more messages to receive, exiting iteration.")
         except Exception as e:
             self.logger.error(f"Fatal error in {self.agent_name}: {e}", exc_info=True)
             raise
@@ -131,6 +147,7 @@ class BaseAgent(ABC):
             await self.close()
             self.logger.info(f"{self.agent_name} stopped")
 
+    @traceable(name="base_agent.process_message", tags=["base", "agent"], metadata={"version": "1.0"})
     async def _process_message(self, message: ServiceBusReceivedMessage) -> bool:
         """
         Process a Service Bus message.
@@ -161,7 +178,7 @@ class BaseAgent(ABC):
             self.logger.info(f"Successfully processed invoice {invoice_id}")
             return True
         except Exception as e:
-            self.logger.error(f"..Failed to process message: {e}", exc_info=True)
+            self.logger.error(f"Failed to process message: {e}", exc_info=True)
             raise
     
     @abstractmethod
@@ -222,15 +239,17 @@ class BaseAgent(ABC):
             row_key=invoice_id
         )
     
-    async def update_invoice(self, invoice: Dict[str, Any]) -> None:
+    async def update_invoice(self, invoice: Dict[str, Any]) -> bool:
         """
         Update invoice in Table Storage.
         
         Args:
             invoice: Invoice entity to update
         """
-        await self.table_storage_client.upsert_entity(
+        key = await self.table_storage_client.upsert_entity(
             entity=invoice,
             partition_key=invoice["department_id"],
             row_key=invoice["invoice_id"]
         )
+        return key == invoice["invoice_id"]
+

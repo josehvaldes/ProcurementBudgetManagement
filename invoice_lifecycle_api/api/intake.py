@@ -28,16 +28,19 @@ class UploadRequestModel(BaseModel):
     department_id: str 
     source_email: EmailStr | None
     priority: str | None
+    document_type: str | None # e.g., "invoice" or "receipt"
     
 def upload_metadata_form(
     department_id: str = Form(...),
     source_email: str | None = Form(None),
     priority: str = Form("normal"),
+    document_type: str = Form("invoice")
 ) -> UploadRequestModel:
     return UploadRequestModel(
         department_id=department_id,
         source_email=source_email,
-        priority=priority
+        priority=priority,
+        document_type=document_type
     )
 
 @router.post("/upload-invoice")
@@ -58,6 +61,7 @@ async def intake(model:UploadRequestModel = Depends(upload_metadata_form),
             department_id=model.department_id,            
             source_email=model.source_email,
             priority=model.priority,
+            document_type=model.document_type,
             line_items=[],
             has_po=False
         )
@@ -67,7 +71,8 @@ async def intake(model:UploadRequestModel = Depends(upload_metadata_form),
         logger.info(f"Created invoice model: {invoice_id}, file: {invoice.file_name}, size: {invoice.file_size} bytes")
         
         if invoice_id and invoice_id != "":
-            return JSONResponse(content=f"File uploaded successfully with ID: {invoice_id}", status_code=200)
+            # return a 202 Accepted response with the invoice ID
+            return JSONResponse(content=f"File uploaded successfully with ID: {invoice_id}", status_code=202)
         else:
             return JSONResponse(content=f"Failed to save invoice Id {invoice_id}", status_code=500)
 

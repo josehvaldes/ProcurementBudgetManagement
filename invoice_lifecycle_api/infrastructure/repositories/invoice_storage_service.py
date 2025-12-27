@@ -37,17 +37,17 @@ class InvoiceStorageService(StorageServiceInterface):
         """Upload file to storage and return the file URL."""
         pass
 
-    async def download_file(self, blob_name: str) -> bytes:
+    async def download_file(self,  container_name:str, blob_name: str) -> bytes:
         """Download file from storage"""
-        blob_client = self.blob_service_client.get_blob_client(container=settings.blob_container_name, blob=blob_name)
+        blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=blob_name)
         stream = io.BytesIO()
         data = await blob_client.download_blob()
         _ = await data.readinto(stream)
         return stream.getvalue()
 
-    async def delete_file(self, blob_name: str) -> None:
+    async def delete_file(self, container_name: str, blob_name: str) -> None:
         """Delete file from storage."""
-        blob_client = self.blob_service_client.get_blob_client(container=settings.blob_container_name, blob=blob_name)
+        blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=blob_name)
         await blob_client.delete_blob()
 
     async def close(self) -> None:
@@ -59,3 +59,13 @@ class InvoiceStorageService(StorageServiceInterface):
         if self.blob_service_client:
             await self.blob_service_client.close()
             logger.info("Blob Storage client closed.")
+
+    async def __aenter__(self):
+        """Enter async context manager."""
+        return self
+    
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+        try: 
+            await self.close()
+        except Exception as e:
+            logger.error(f"Error closing Blob Storage client: {e}")

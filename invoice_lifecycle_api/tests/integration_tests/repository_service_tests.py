@@ -7,7 +7,7 @@ import uuid
 
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger, setup_logging
-from shared.models.invoice import Invoice, InvoiceSource
+from shared.models.invoice import DocumentType, Invoice, InvoiceSource
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
@@ -31,6 +31,7 @@ class RepositoryServiceTests:
             invoice_id=uuid.uuid4().hex[:12],
             department_id=f"dept_{uuid.uuid4().hex[:6]}",
             source=InvoiceSource.API,
+            document_type=DocumentType.INVOICE,
             source_email=f"test@test.com",
             priority="high",
             file_name="invoice.pdf",
@@ -64,8 +65,9 @@ class RepositoryServiceTests:
 
     async def test_download_file(self):
         blob_name = f"2025/12/22/invoice_3c4a78652c62.jpg"
+        container_name = settings.blob_container_name
         print(f"Downloading blob with name: {blob_name}")
-        downloaded_content = await self.blob_repository.download_file(blob_name)
+        downloaded_content = await self.blob_repository.download_file(container_name, blob_name)
         print(f"Downloaded blob content length: {len(downloaded_content)} bytes")
 
         assert downloaded_content is not None
@@ -74,9 +76,10 @@ class RepositoryServiceTests:
             f.write(downloaded_content)
 
     async def test_delete_file(self):
+        container_name = settings.blob_container_name
         blob_name = f"2025/12/22/invoice_3c4a78652c62.jpg"
         print(f"Deleting blob with name: {blob_name}")
-        await self.blob_repository.delete_file(blob_name)
+        await self.blob_repository.delete_file(container_name, blob_name)
         print(f"Deleted blob: {blob_name}")
 
 

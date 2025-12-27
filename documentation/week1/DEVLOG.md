@@ -102,12 +102,14 @@ Building an AI-powered multi-agent system using **event-driven choreography** to
   - [X] Test message filtering (only invoice.created)
   - [X] Download file from Blob Storage  
   - [X] Implement complete_message() after processing
-- Set up LangChain with Azure OpenAI connection
-- Configure LangSmith for agent tracing
-- Integrate Document Intelligence extraction into intake flow
-- **Test end-to-end locally**: API → Blob Storage → Table Storage → Service Bus → Intake Agent ⭐
-- Create local development environment setup documentation
-- **Set up Azure Logic App for email monitoring**
+- [-] Set up LangChain with Azure OpenAI connection
+     Postpone for later agents
+- [X] Configure LangSmith for agent tracing
+- [X] Integrate Document Intelligence extraction into intake flow
+- [X] **Test end-to-end locally**: API → Blob Storage → Table Storage → Service Bus → Intake Agent ⭐
+- [X] Create local development environment setup documentation
+
+- [X] **Set up Azure Logic App for email monitoring**
   - Create Logic App resource
   - Configure Outlook.com / Office 365 connector
   - Set up email trigger (when new email arrives)

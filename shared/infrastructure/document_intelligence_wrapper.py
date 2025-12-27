@@ -3,10 +3,13 @@ Azure Document Intelligence client wrapper for OCR and document extraction.
 """
 
 import logging
+from threading import RLock
 from typing import Optional, Dict, Any, List
 from azure.ai.documentintelligence.aio import DocumentIntelligenceClient
 from azure.identity.aio import DefaultAzureCredential
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentAnalysisFeature, AnalyzeResult
+
+from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +20,9 @@ class DocumentIntelligenceWrapper:
     Handles invoice and receipt extraction.
     """
     
+    _client = None
+    _client_lock = RLock()
+
     def __init__(self, endpoint: str):
         """
         Initialize Document Intelligence client.
@@ -25,10 +31,27 @@ class DocumentIntelligenceWrapper:
             endpoint: Azure Document Intelligence endpoint
         """
         self.endpoint = endpoint
-        self.client:DocumentIntelligenceClient = DocumentIntelligenceClient(
-            endpoint=endpoint,
-            credential=DefaultAzureCredential()
-        )
+        
+        self._initialize_client()
+        self.client: DocumentIntelligenceClient = DocumentIntelligenceWrapper._client
+
+    def _initialize_client(self) -> None:
+        """Initialize the Document Intelligence client if not already initialized."""
+        if DocumentIntelligenceWrapper._client is None:
+            with self._client_lock:
+                if DocumentIntelligenceWrapper._client is None:
+                    credentials_manager = get_credential_manager()
+                    logger.info("Initializing Document Intelligence client")
+                    DocumentIntelligenceWrapper._client = DocumentIntelligenceClient(
+                        endpoint=self.endpoint,
+                        credential=credentials_manager.get_credential()
+                    )
+
+    async def close(self) -> None:
+        """Close the Document Intelligence client."""
+        if self.client:
+            await self.client.close()
+            logger.info("Document Intelligence client closed.")
 
     async def analyze_invoice(self, document_data: bytes, locale: str = "en-US", additional_fields:list[str] = [] ) -> list[Dict[str, Any]]:
         """
@@ -185,7 +208,7 @@ class DocumentIntelligenceWrapper:
                     body=analyze_request,
                     locale=locale, 
                 )
-            result = poller.result()
+            result = await poller.result()
             
             # Extract receipt data
             receipt_data = self._extract_receipt_data(result, additional_fields)
@@ -211,6 +234,7 @@ class DocumentIntelligenceWrapper:
         field_names.extend(additional_fields)
 
         document_list = []
+        logger.info(f"Extracting receipt data from documents")
         for idx, document in enumerate(result.documents):
             logger.info(f"Extracting data from receipt document #{idx + 1}")
             document_data = {}

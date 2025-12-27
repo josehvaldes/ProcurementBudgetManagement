@@ -36,6 +36,11 @@ class InvoiceSource(str, Enum):
     UPLOAD = "upload"
     MANUAL = "manual"
 
+#class for invouice type: Invoice or receipt
+class DocumentType(str, Enum):
+    """Document type."""
+    INVOICE = "invoice"
+    RECEIPT = "receipt"
 
 @dataclass
 class LineItem:
@@ -56,7 +61,8 @@ class Invoice:
     invoice_number: Optional[str] = None
     vendor_id: Optional[str] = None
     vendor_name: Optional[str] = None
-    
+    document_type: DocumentType = DocumentType.INVOICE
+
     # ========== AMOUNTS ==========
     amount: Optional[Decimal] = None  # Total invoice amount
     currency: str = "USD"
@@ -87,7 +93,7 @@ class Invoice:
     file_uploaded_at: Optional[datetime] = None
     extracted_data: Optional[Dict[str, Any]] = None  # Parsed OCR data
     extraction_confidence: Optional[float] = None  # 0-1
-    qr_code_data: Optional[str] = None
+    qr_codes_data: Optional[list[str]] = None
     
     # ========== LINE ITEMS ==========
     line_items: List[LineItem] = field(default_factory=list)
