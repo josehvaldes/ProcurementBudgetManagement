@@ -1,0 +1,243 @@
+[
+    {
+        "vendor_id": "1",
+        "name": "Contoso Supplies",
+        "display_name": "Contoso Supplies Ltd.",
+        "tax_id": "98-7654321",
+        "vendor_number": "VEND-1001",
+
+        "contact_name": "John Doe",
+        "contact_email": "john.doe@contoso.com",
+        "contact_phone": "555-1234",
+        "address": "123 Contoso St., Suite 100 , Redmond, WA 98052, USA",
+        "website": "https://www.contoso.com",
+
+        "approved": true,
+        "approved_by": "Jane Smith",
+        "approved_date": "2023-01-15T10:00:00Z",
+        "active": true,
+        "suspended": false,
+        "suspension_reason": null,
+
+        "payment_terms": "NET-30",
+        "payment_method": "ACH",
+        "bank_account": {
+            "bank_name": "Chase Bank",
+            "account_number": "****1234",
+            "routing_number": "021000021",
+            "account_type": "checking"
+        },
+        "currency": "USD",
+
+        "spend_limit": 50000.00,
+        "monthly_spend_limit": 15000.00,
+        "ytd_spend": 125340.50,        
+        "last_invoice_date": "2025-12-28T10:00:00Z",
+        "total_invoices": 47,
+
+        "contracts": [{
+            "contract_id": "CONTRACT-2024-001",
+            "contract_start_date": "2024-01-01T00:00:00Z",
+            "contract_end_date": "2026-12-31T23:59:59Z",
+            "contract_value": 180000.00,
+            "terms": "Standard supply agreement for office products.",
+            "status": "active"
+        }],
+        "auto_approve": true,
+        "auto_approve_limit": 5000.00,
+
+        "categories": [ "Office Supplies", "Furniture", "Cleaning Supplies" ],
+        "tags": [ "preferred", "bulk-discount", "local" ],
+        "industry": "Wholesale Distribution",
+        "size": "medium",
+
+        "on_time_delivery_rate": 4.8,
+        "quality_rating": 4.6,
+        "last_review_date": "2025-11-10T10:00:00Z",
+        "notes": "Excellent supplier for office needs. Volume discounts available over $10k.",
+
+        "created_date": "2023-01-15T10:00:00Z",
+        "updated_date": "2025-11-10T12:00:00Z",
+        "created_by": "admin",
+        "updated_by": "procurement_manager"
+    },
+    {
+        "vendor_id": "2",
+        "name": "Fabrikam Cloud Services",
+        "display_name": "Fabrikam Cloud Services Inc.",
+        "tax_id": "12-3456789",
+        "vendor_number": "VEND-1002",
+
+        "contact_name": "Alice Johnson",
+        "contact_email": "alice.johnson@fabrikam.com",
+        "contact_phone": "555-5678",
+        "address": "123 Contoso St., Suite 100 , Redmond, WA 98052, USA",
+        "website": "https://www.fabrikam.com",
+
+        "approved": true,
+        "approved_by": "IT Director",
+        "approved_date": "2024-03-20T10:00:00Z",
+        "active": true,
+        "suspended": false,
+        "suspension_reason": null,
+
+        "payment_terms": "NET-45",
+        "payment_method": "Wire Transfer",
+        "bank_account": {
+            "bank_name": "Bank of America",
+            "account_number": "****5678",
+            "routing_number": "026009593",
+            "account_type": "business_checking"
+        },
+        "currency": "USD",
+
+        "spend_limit": 200000.00,
+        "monthly_spend_limit": 25000.00,
+        "ytd_spend": 287650.00,
+        "last_invoice_date": "2026-01-01T10:00:00Z",
+        "total_invoices": 12,
+
+        "contracts": [{
+            "contract_id": "CONTRACT-2024-CLD-045",
+            "contract_start_date": "2024-03-01T00:00:00Z",
+            "contract_end_date": "2027-02-28T23:59:59Z",
+            "contract_value": 900000.00,
+            "terms": "Three-year agreement for cloud services and software licenses.",
+            "status": "active"
+        }],
+        "auto_approve": true,
+        "auto_approve_limit": 30000.00,
+
+        "categories": [ "Cloud Services", "Software Licenses", "IT Infrastructure" ],
+        "tags": [ "strategic-partner", "enterprise", "SaaS" ],
+        "industry": "Technology",
+        "size": "large",
+
+        "on_time_delivery_rate": 4.9,
+        "quality_rating": 4.8,
+        "last_review_date": "2025-12-15T10:00:00Z",
+        "notes": "Primary cloud infrastructure provider. Monthly recurring billing.",
+
+        "created_date": "2024-03-15T10:00:00Z",
+        "updated_date": "2025-12-15T12:00:00Z",
+        "created_by": "it_admin",
+        "updated_by": "it_director"
+    },
+    {
+        "vendor_id": "3",
+        "name": "Northwind Consulting",
+        "display_name": "Northwind Consulting Group",
+        "tax_id": "23-4567890",
+        "vendor_number": "VEND-1003",
+
+        "contact_name": "Robert Williams",
+        "contact_email": "r.williams@northwind-consulting.com",
+        "contact_phone": "555-9012",
+        "address": "456 Northwind Ave., Suite 200, Seattle, WA 98101, USA",
+        "website": "https://www.northwind-consulting.com",
+
+        "approved": true,
+        "approved_by": "CFO",
+        "approved_date": "2023-06-10T10:00:00Z",
+        "active": true,
+        "suspended": false,
+        "suspension_reason": null,
+
+        "payment_terms": "NET-15",
+        "payment_method": "Check",
+        "bank_account": {
+            "bank_name": "Wells Fargo",
+            "account_number": "****9012",
+            "routing_number": "121000248",
+            "account_type": "business_checking"
+        },
+        "currency": "USD",
+
+        "spend_limit": 75000.00,
+        "monthly_spend_limit": 20000.00,
+        "ytd_spend": 68450.00,
+        "last_invoice_date": "2025-12-20T10:00:00Z",
+        "total_invoices": 23,
+
+        "contracts": [],
+        "auto_approve": false,
+        "auto_approve_limit": null,
+
+        "categories": [ "Professional Services", "Business Consulting", "Training" ],
+        "tags": [ "consulting", "project-based", "expertise" ],
+        "industry": "Professional Services",
+        "size": "small",
+
+        "on_time_delivery_rate": 4.3,
+        "quality_rating": 4.5,
+        "last_review_date": "2025-09-22T10:00:00Z",
+        "notes": "Engaged for strategic projects. Requires SOW approval for each engagement.",
+
+        "created_date": "2023-06-05T10:00:00Z",
+        "updated_date": "2025-09-22T12:00:00Z",
+        "created_by": "admin",
+        "updated_by": "finance_team"
+    },
+    {
+        "vendor_id": "4",
+        "name": "Adventure Logistics",
+        "display_name": "Adventure Works Logistics Ltd.",
+        "tax_id": "34-5678901",
+        "vendor_number": "VEND-1004",
+
+        "contact_name": "Carol Martinez",
+        "contact_email": "c.martinez@adventurelogistics.com",
+        "contact_phone": "555-3456",
+        "address": "123 Contoso St., Suite 100 , Redmond, WA 98052, USA",
+        "website": "https://www.adventure-logistics.com",
+
+        "approved": true,
+        "approved_by": "Operations Manager",
+        "approved_date": "2024-08-01T10:00:00Z",
+        "active": false,
+        "suspended": true,
+        "suspension_reason": "Late deliveries - under review",
+
+        "payment_terms": "NET-60",
+        "payment_method": "Credit Card",
+        "bank_account": {
+            "bank_name": "Citibank",
+            "account_number": "****3456",
+            "routing_number": "322271627",
+            "account_type": "business_savings"
+        },
+        "currency": "USD",
+
+        "spend_limit": 30000.00,
+        "monthly_spend_limit": 8000.00,
+        "ytd_spend": 42180.75,
+        "last_invoice_date": "2025-10-15T10:00:00Z",
+        "total_invoices": 31,
+
+        "contracts": [{
+            "contract_id": "CONTRACT-2024-LOG-089",
+            "contract_start_date": "2024-08-01T00:00:00Z",
+            "contract_end_date": "2025-07-31T23:59:59Z",
+            "contract_value": 96000.00,
+            "terms": "One-year agreement for logistics services.",
+            "status": "terminated"
+        }],
+        "auto_approve": false,
+        "auto_approve_limit": null,
+
+        "categories": [ "Shipping", "Warehousing", "Freight" ],
+        "tags": [ "logistics", "domestic", "under-review" ],
+        "industry": "Transportation & Logistics",
+        "size": "medium",
+
+        "on_time_delivery_rate": 3.2,
+        "quality_rating": 3.5,
+        "last_review_date": "2025-11-30T10:00:00Z",
+        "notes": "Suspended due to consistent late deliveries in Q4 2025. Performance improvement plan required.",
+
+        "created_date": "2024-07-20T10:00:00Z",
+        "updated_date": "2025-12-01T12:00:00Z",
+        "created_by": "operations_admin",
+        "updated_by": "operations_manager"
+    }
+]

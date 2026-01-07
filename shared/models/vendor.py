@@ -2,12 +2,13 @@
 Vendor domain model.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
+import json
 from typing import Optional, List, Dict, Any
 from enum import Enum
-
+from shared.utils.convert import convert_to_table_entity
 
 class VendorSize(str, Enum):
     """Vendor size classification."""
@@ -24,16 +25,8 @@ class VendorContract:
     contract_end_date: datetime
     contract_value: Decimal
     terms: Optional[str] = None
+    status: Optional[str] = None  # active, expired, terminated
 
-
-@dataclass
-class VendorAddress:
-    """Vendor address information."""
-    street: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: str = "USA"
 
 
 @dataclass
@@ -64,7 +57,7 @@ class Vendor:
     contact_name: Optional[str] = None
     contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
-    address: Optional[VendorAddress] = None
+    address: Optional[str] = None
     website: Optional[str] = None
     
     # ========== APPROVAL & STATUS ==========
@@ -90,9 +83,6 @@ class Vendor:
     
     # ========== CONTRACTS & AGREEMENTS ==========
     contracts: List[VendorContract] = field(default_factory=list)
-    contract_start_date: Optional[datetime] = None
-    contract_end_date: Optional[datetime] = None
-    contract_value: Optional[Decimal] = None
     auto_approve: bool = False  # Auto-approve invoices from vendor
     auto_approve_limit: Optional[Decimal] = None  # Max for auto-approval
     
@@ -109,11 +99,11 @@ class Vendor:
     notes: Optional[str] = None
     
     # ========== METADATA ==========
-    created_date: datetime = field(default_factory=datetime.utcnow)
-    updated_date: datetime = field(default_factory=datetime.utcnow)
+    created_date: datetime = field(default_factory=datetime.now(timezone.utc))
+    updated_date: datetime = field(default_factory=datetime.now(timezone.utc))
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
-    
+
     def can_auto_approve(self, amount: Decimal) -> bool:
         """Check if invoice can be auto-approved for this vendor."""
         if not self.auto_approve or not self.approved or not self.active:
@@ -132,5 +122,29 @@ class Vendor:
         """Update vendor spending metrics."""
         self.ytd_spend += amount
         self.total_invoices += 1
-        self.last_invoice_date = datetime.utcnow()
-        self.updated_date = datetime.utcnow()
+        self.last_invoice_date = datetime.now(timezone.utc)
+        self.updated_date = datetime.now(timezone.utc)
+
+    def to_dict(self) -> dict:
+        """Convert Vendor dataclass to dictionary."""
+        result = asdict(self)
+        result = convert_to_table_entity(result)
+        return result
+    
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Vendor':
+        """Populate Vendor fields from a dictionary."""
+        vendor = Vendor(**data)
+
+        bank_account_data = data.get('bank_account', None)
+        if bank_account_data:
+            bank_data = json.loads(bank_account_data) if isinstance(bank_account_data, str) else bank_account_data
+            vendor.bank_account = BankAccount(**bank_data)
+
+        contracts_data = data.get('contracts', "")
+        if contracts_data:
+            contracts_list = json.loads(contracts_data) if isinstance(contracts_data, str) else contracts_data
+            vendor.contracts = [VendorContract(**contract) for contract in contracts_list]
+
+        return vendor

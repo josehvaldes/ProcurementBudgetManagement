@@ -15,6 +15,7 @@ class DIContainer:
     
     def __init__(self):
         self._services = {}
+        self._instances = []
         self._singletons = {}
         self._setup_services()
 
@@ -29,10 +30,9 @@ class DIContainer:
             self._singletons[TableServiceInterface] = InMemoryTableRepositoryService()
             self._singletons[StorageServiceInterface] = InMemoryInvoiceStorageService()
         else:
-            self._singletons[TableServiceInterface] = TableStorageService()
             self._singletons[StorageServiceInterface] = InvoiceStorageService()
 
-        
+        self._services[TableServiceInterface] = TableStorageService
 
     def get_service(self, service_type, *args, **kwargs):
         
@@ -43,7 +43,9 @@ class DIContainer:
         """Get a service instance by type."""
         if service_type in self._services:
             service_class = self._services[service_type]
-            return service_class(*args, **kwargs)
+            instance = service_class(*args, **kwargs)
+            self._instances.append(instance)
+            return instance
         raise ValueError(f"Service {service_type} not registered")
 
 # Global container instance
@@ -55,14 +57,21 @@ async def close_all_services() -> None:
         if hasattr(service, "close") and callable(service.close):
             await service.close()
 
-    for service in _container._services.values():
-        if hasattr(service, "close") and callable(service.close):
-            await service.close()
+    for instance in _container._instances:
+        if hasattr(instance, "close") and callable(instance.close):
+            await instance.close()
 
+def get_invoice_repository_service() -> TableServiceInterface:
+    """Dependency injection function for invoice repository service."""
+    return _container.get_service(TableServiceInterface, 
+                                  storage_account_url=settings.table_storage_account_url,
+                                  table_name=settings.invoices_table_name)
 
-def get_repository_service() -> TableServiceInterface:
-    """Dependency injection function for product service."""
-    return _container.get_service(TableServiceInterface)
+def get_vendor_repository_service() -> TableServiceInterface:
+    """Dependency injection function for vendor repository service."""
+    return _container.get_service(TableServiceInterface, 
+                                  storage_account_url=settings.table_storage_account_url,
+                                  table_name=settings.vendors_table_name)
 
 def get_invoice_storage_service():
     """Dependency injection function for invoice storage service."""
@@ -70,7 +79,7 @@ def get_invoice_storage_service():
 
 def get_event_choreographer_service():
     """Dependency injection function for event choreographer service."""
-    table_repository = _container.get_service(TableServiceInterface)
+    table_repository = get_invoice_repository_service()
     invoice_storage = _container.get_service(StorageServiceInterface)
     messaging_service = _container.get_service(MessagingServiceInterface)
     return EventChoreographer(table_repository, invoice_storage, messaging_service)

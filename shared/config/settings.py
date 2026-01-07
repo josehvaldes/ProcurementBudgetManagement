@@ -46,12 +46,12 @@ class Settings(BaseSettings):
     blob_container_name: str = "invoice"
     
     # LangChain / LLM
-    openai_api_key: Optional[str] = None
     azure_openai_endpoint: Optional[str] = None
-    azure_openai_api_key: Optional[str] = None
     azure_openai_deployment_name: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
     
+    azure_openai_api_version: str = "2024-02-15"
+    
+           
     # LangSmith
     langsmith_api_key: Optional[str] = None
     langsmith_project: Optional[str] = None

@@ -43,15 +43,6 @@ class DocumentType(str, Enum):
     RECEIPT = "receipt"
 
 @dataclass
-class LineItem:
-    """Invoice line item."""
-    description: str
-    quantity: float
-    unit_price: Decimal
-    total: Decimal
-    category: Optional[str] = None
-
-@dataclass
 class Invoice:
     """Invoice domain model aligned with Azure Table Storage schema."""
     
@@ -74,13 +65,13 @@ class Invoice:
     # ========== DATES ==========
     issued_date: Optional[datetime] = None  # When vendor issued invoice
     due_date: Optional[datetime] = None
-    created_date: datetime = field(default_factory=datetime.utcnow)
-    updated_date: datetime = field(default_factory=datetime.utcnow)
-    
+    created_date: datetime = field(default_factory=datetime.now(timezone.utc))
+    updated_date: datetime = field(default_factory=datetime.now(timezone.utc))
+
     # ========== STATE & WORKFLOW ==========
     state: InvoiceState = InvoiceState.CREATED
     previous_state: Optional[InvoiceState] = None
-    state_changed_at: datetime = field(default_factory=datetime.utcnow)
+    state_changed_at: datetime = field(default_factory=datetime.now(timezone.utc))
     state_changed_by: Optional[str] = None  # Agent or user who changed state
     
     # ========== DOCUMENT & EXTRACTION ==========
@@ -95,9 +86,9 @@ class Invoice:
     extraction_confidence: Optional[float] = None  # 0-1
     qr_codes_data: Optional[list[str]] = None
     
-    # ========== LINE ITEMS ==========
-    line_items: List[LineItem] = field(default_factory=list)
-    
+    # ========== User Input & User Details ==========
+    user_comments: Optional[str] = None
+
     # ========== PURCHASE ORDER MATCHING ==========
     has_po: Optional[bool]  = False
     po_number: Optional[str] = None
@@ -113,19 +104,12 @@ class Invoice:
     
     # ========== VALIDATION & APPROVAL ==========
     validation_flags: List[str] = field(default_factory=list)
+    validation_errors: List[str] = field(default_factory=list)
     validation_passed: bool = False
     approval_required: bool = False
     approved_by: Optional[str] = None
     approved_date: Optional[datetime] = None
     rejection_reason: Optional[str] = None
-    
-    # ========== PAYMENT INFORMATION ==========
-    payment_terms: Optional[str] = None  # net-30, net-60
-    payment_scheduled_date: Optional[datetime] = None
-    payment_batch_id: Optional[str] = None
-    payment_completed_date: Optional[datetime] = None
-    payment_method: Optional[str] = None  # ACH, Wire, Check
-    payment_reference: Optional[str] = None
     
     # ========== METADATA & TRACKING ==========
     source: InvoiceSource = InvoiceSource.UPLOAD
@@ -164,17 +148,10 @@ class Invoice:
     def to_dict(self) -> dict:
         """Convert Invoice dataclass to dictionary."""
         result = asdict(self)
-        result['line_items'] = [asdict(item) for item in self.line_items]
         result = convert_to_table_entity(result)
         return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Invoice":
         """Create Invoice instance from dictionary."""
-        line_items_data = data.get('line_items', [])
-        line_items: List[LineItem] = []
-        print(f"Deserializing line items: {line_items_data}")
-        if line_items_data and len(line_items_data) > 0 and isinstance(line_items_data[0], dict):
-            line_items = [LineItem(**item) for item in line_items_data]
-        data['line_items'] = line_items
         return Invoice(**data)

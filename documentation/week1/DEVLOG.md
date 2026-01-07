@@ -109,7 +109,8 @@ Building an AI-powered multi-agent system using **event-driven choreography** to
 - [X] **Test end-to-end locally**: API → Blob Storage → Table Storage → Service Bus → Intake Agent ⭐
 - [X] Create local development environment setup documentation
 
-- [X] **Set up Azure Logic App for email monitoring**
+#Postpone until the end deployment phase.
+- [-] **Set up Azure Logic App for email monitoring**
   - Create Logic App resource
   - Configure Outlook.com / Office 365 connector
   - Set up email trigger (when new email arrives)
@@ -133,25 +134,34 @@ Building an AI-powered multi-agent system using **event-driven choreography** to
 - ✅ **Document Intelligence successfully extracts data from 90%+ test invoices**
 - ✅ **QR codes successfully decoded from receipt images**
 - ✅ **Extraction helper functions created and tested**
+
+#Postpone until the end deployment phase.
 - ✅ **Logic App successfully monitors email and triggers API**
 - ✅ **End-to-end test: Email → Logic App → API → Blob Storage → Service Bus → Agent (local)** ⭐
 
 
 **Technical Decisions:**
-- 
+- Defer the logic apps configuration and email monitoring. since the paid subscription of  Microsoft 365 will not be used fully for this project.
+- Use Azure service bus as a event driven frameworks instead of Azure Event Grid.
+- Azure Document intelligence will be handle through wrappers 
+- Agents will run independently, or through an Agent Orchestrator script or both.
+- Product Orders will be reduced to an optional input in the invoice model.
+- Invoices and receipt will be handle in the same Invoice object model, and will be differentiated by a "document_type" with 2 possible values "invoice", "receipt"
 
 **Challenges & Solutions:**
-- *Document any issues you encounter here*
-- 
+- Review the logic app implementation and technical/licensing limitation inside the current azure environment.
+
 
 **Learnings:**
-- *Key insights from today's work*
-- 
+- Logic apps licensing requiremets 
+- how to implement signals in python for clean exits
+- Azure service bus wrappers and interators
+- Python __aexit__ and __aenter__ functions in "async with" clauses
 
 **Next Steps:**
-- [ ] 
+- [-] Week 2 plan 
 
-**Time Invested:**  hours
+**Time Invested:** 50 hours
 
 
 
@@ -206,6 +216,79 @@ Blob Storage Tests: ⭐
 ☐ Generate SAS URLs
 ☐ Verify hierarchical naming
 ☐ Test error handling (large files, network errors)
+```
+
+---
+
+## Week 2: Intake & Validation Agents
+**Goal:** Build the first two agents in the pipeline with full LangChain integration and Blob Storage access ⭐, all running locally
+
+### Key Deliverables
+- Intake Agent (extracts invoice data from Blob Storage ⭐, identifies vendors) **running locally**
+- Validation Agent (verifies vendors, checks policies) **running locally**
+- Both agents pulling from their Service Bus subscriptions
+- Message-driven communication between agents working
+- Vendor management functionality
+- Audit trail implementation
+
+### Tasks
+- **Complete Intake Agent implementation with Blob Storage** ⭐
+  - ✅ Get invoice metadata from Table Storage
+  - ✅ Download file from Blob Storage using blob_name
+  - ✅ Integrate Document Intelligence extraction functions from Week 1
+  - ✅ Create tools for vendor identification logic
+  - ✅ Implement state transition to EXTRACTED
+  - ✅ Publish message with subject='invoice.extracted'
+  - ✅ Add comprehensive error handling (blob download failures)
+- Set up Validation Agent Service Bus subscription
+  - ✅ Create receiver for validation-agent-subscription
+  - ✅ Implement message pulling loop
+- Build vendor database and management
+  - ✅ Seed Vendors table with test data
+  - Create vendor lookup functions
+- Implement Validation Agent with LangChain
+  - Create tools for vendor verification
+  - Build spending limit checks
+  - Implement pricing validation
+  - Add duplicate invoice detection
+  - Publish message with subject='invoice.validated' or 'invoice.failed'
+- Implement audit trail in AuditLog table
+  - Log every state transition
+  - Include agent name, timestamp, old/new state
+- **Test locally: API → Blob Storage → Intake Agent → Validation Agent** ⭐
+  - All running on local machine
+  - Connected to Azure Service Bus and Blob Storage in cloud
+- Add comprehensive logging for debugging
+- Create helper script to monitor Service Bus queues and Blob Storage
+
+### Success Criteria
+- ✅ Invoice flows from CREATED → EXTRACTED → VALIDATED
+- ✅ **Intake Agent successfully downloads files from Blob Storage** ⭐
+- ✅ **Files of various sizes (100KB-5MB) processed correctly** ⭐
+- ✅ Agents process messages independently (no coupling)
+- ✅ Invalid invoices properly flagged and sent to FAILED state
+- ✅ All actions traced in LangSmith
+- ✅ Dead letter queue properly handles failures
+- ✅ Both agents run locally without deployment
+- ✅ Audit trail captures all state changes
+- ✅ **Blob Storage error handling works correctly** ⭐
+
+### Testing Scenarios
+```python
+# Test 1: Valid invoice flow
+upload_invoice() → Blob Storage → CREATED → EXTRACTED → VALIDATED
+
+# Test 2: Large file (5MB PDF)
+upload_large_invoice() → Blob Storage → CREATED → EXTRACTED → VALIDATED
+
+# Test 3: Invalid vendor
+upload_invoice(unapproved_vendor) → CREATED → EXTRACTED → FAILED
+
+# Test 4: Blob download failure
+simulate_blob_error() → CREATED → FAILED (with retry)
+
+# Test 5: Agent failure recovery
+kill_agent_mid_processing() → message_abandoned → retry_succeeds
 ```
 
 ---

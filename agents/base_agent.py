@@ -9,6 +9,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 from azure.servicebus import ServiceBusReceivedMessage
+from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
 from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
@@ -53,7 +54,7 @@ class BaseAgent(ABC):
 
         # Initialize clients
         self.service_bus_client: ServiceBusMessagingService = None
-        self.table_storage_client: TableStorageService = None
+        self.invoice_table_client: TableStorageService = None
         self.initialize_clients()
 
     
@@ -63,7 +64,7 @@ class BaseAgent(ABC):
         
         self.logger.info(f"storage_account_url: {settings.table_storage_account_url} | table_name: {settings.invoices_table_name}") 
         # Initialize Table Storage client
-        self.table_storage_client = TableStorageService(
+        self.invoice_table_client = TableStorageService(
             storage_account_url=settings.table_storage_account_url,
             table_name=settings.invoices_table_name
         )
@@ -78,12 +79,14 @@ class BaseAgent(ABC):
     async def close(self) -> None:
         """Close agent resources."""
         self.logger.info(f"Closing {self.agent_name} clients...")
-        if self.table_storage_client:
-            await self.table_storage_client.close()
+        if self.invoice_table_client:
+            await self.invoice_table_client.close()
         if self.service_bus_client:
             await self.service_bus_client.close()
         
         await self.release_resources()
+        
+        await get_credential_manager().close()
         
     @abstractmethod
     async def release_resources(self) -> None:
@@ -114,7 +117,6 @@ class BaseAgent(ABC):
                         if completed:
                             await receiver.complete_message(message)
                         else:
-                            # this should not happen, but just in case
                             self.logger.warning(f"Message processing not completed, abandoning message: [{message}]")   
                             await receiver.dead_letter_message(message
                                 , reason="ProcessingIncomplete"
@@ -158,36 +160,41 @@ class BaseAgent(ABC):
         try:
             # Parse message body
             body = json.loads(str(message))
-            invoice_id = body.get("invoice_id")
-            event_type = body.get("event_type")
-            department_id = body.get("department_id")
-            
+            invoice_id = body["invoice_id"]
+            department_id = body["department_id"]
+
+            if not invoice_id or not department_id or invoice_id.strip() == "" or department_id.strip() == "":
+                raise ValueError("Message missing required fields: invoice_id or department_id")
+
             self.logger.info(
                 f"Processing message: subject={message.subject}, "
-                f"invoice_id={invoice_id}"
+                f"invoice_id={invoice_id}, department_id={department_id}"
             )
-            
+
             # Call agent-specific processing logic
-            result = await self.process_invoice(invoice_id, body)
+            result = await self.process_invoice(body)
 
             # Publish next state message if processing succeeded
 
-            if result:
+            if result is not None and result["state"] not in ["FAILED", "MANUAL_REVIEW"]:
                 await self._publish_next_state(invoice_id, result)
 
-            self.logger.info(f"Successfully processed invoice {invoice_id}")
-            return True
+                self.logger.info(f"Successfully processed invoice {invoice_id}")
+                return True
+            else:
+                self.logger.warning(f"Processing of invoice {invoice_id} did not complete successfully; no next state published.")
+                return False
+            
         except Exception as e:
             self.logger.error(f"Failed to process message: {e}", exc_info=True)
             raise
     
     @abstractmethod
-    async def process_invoice(self, invoice_id: str, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def process_invoice(self, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Process an invoice. Must be implemented by subclasses.
         
         Args:
-            invoice_id: Invoice ID
             message_data: Message payload
             
         Returns:
@@ -234,7 +241,7 @@ class BaseAgent(ABC):
         Returns:
             Invoice entity or None
         """
-        return await self.table_storage_client.get_entity(
+        return await self.invoice_table_client.get_entity(
             partition_key=department_id,
             row_key=invoice_id
         )
@@ -246,7 +253,7 @@ class BaseAgent(ABC):
         Args:
             invoice: Invoice entity to update
         """
-        key = await self.table_storage_client.upsert_entity(
+        key = await self.invoice_table_client.upsert_entity(
             entity=invoice,
             partition_key=invoice["department_id"],
             row_key=invoice["invoice_id"]

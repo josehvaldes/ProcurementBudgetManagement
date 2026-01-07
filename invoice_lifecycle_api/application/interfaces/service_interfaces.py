@@ -3,7 +3,20 @@ Product service interface for dependency injection.
 """
 from abc import ABC, abstractmethod
 import asyncio
+from enum import Enum
 from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
+
+class JoinOperator(str, Enum):
+    AND = " and "
+    OR = " or "
+
+class CompareOperator(str, Enum):
+    EQUAL = "eq"
+    NOT_EQUAL = "ne"
+    GREATER_THAN = "gt"
+    LESS_THAN = "lt"
+    GREATER_THAN_OR_EQUAL = "ge"
+    LESS_THAN_OR_EQUAL = "le"
 
 class TableServiceInterface(ABC):
     """Abstract base class for product service implementations."""
@@ -16,6 +29,11 @@ class TableServiceInterface(ABC):
     @abstractmethod
     async def get_entity(self, partition_key: str, row_key: str) -> dict | None:
         """Retrieve entity by ID."""
+        pass
+
+    @abstractmethod
+    async def query_entities(self, filters_query: list[tuple[str, str]], commonJoin: JoinOperator = JoinOperator.AND, commonCompare: CompareOperator = CompareOperator.EQUAL) -> list[dict]:
+        """Query entities from the table storage."""
         pass
 
     @abstractmethod

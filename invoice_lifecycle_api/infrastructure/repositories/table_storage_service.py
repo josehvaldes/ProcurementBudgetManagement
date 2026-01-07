@@ -2,23 +2,23 @@ import traceback
 import uuid
 from azure.data.tables.aio import TableClient
 
-from shared.config.settings import settings
 from shared.utils.logging_config import get_logger
-from shared.models.invoice import Invoice
+
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
-from invoice_lifecycle_api.application.interfaces.service_interfaces import TableServiceInterface
+from invoice_lifecycle_api.application.interfaces.service_interfaces import CompareOperator, JoinOperator, TableServiceInterface
 
 
 logger = get_logger(__name__)
 
 AZURE_TABLE_METADATA_FIELDS = {'PartitionKey', 'RowKey', 'Timestamp', 'etag', 'odata.etag', 'odata.metadata'}
 
+
+
 class TableStorageService(TableServiceInterface):
-    
-    def __init__(self, storage_account_url: str = None, table_name: str = None):
-        
-        self.account_url = storage_account_url or settings.table_storage_account_url
-        self.table_name = table_name or settings.invoices_table_name
+
+    def __init__(self, storage_account_url, table_name):
+        self.account_url = storage_account_url
+        self.table_name = table_name
 
         credential_manager = get_credential_manager()
         self.table_client = TableClient(
@@ -26,7 +26,6 @@ class TableStorageService(TableServiceInterface):
             table_name=self.table_name,
             credential=credential_manager.get_credential()
         )
-        credential_manager.close()
 
     async def upsert_entity(self, entity: dict, partition_key: str, row_key: str) -> str:
         """Save an entity to the Azure Table Storage."""
@@ -53,6 +52,36 @@ class TableStorageService(TableServiceInterface):
             logger.error(f"Error retrieving entity from Table Storage: {e}")
             return None
 
+    async def query_entities(self, filters_query: list[tuple[str, str]], commonJoin: JoinOperator = JoinOperator.AND, commonCompare: CompareOperator = CompareOperator.EQUAL) -> list[dict]:
+        """Query entities from Azure Table Storage using a filter string."""
+        results = []
+        try:
+            parameters = {}
+
+            index = 1
+            for field, value in filters_query:
+                if parameters.get(f"{field.lower()}") is None:
+                    parameters[f"{field.lower()}"] = value
+                else:
+                    parameters[f"{field.lower()}{index}"] = value
+                    index += 1
+            
+            name_filter = f"{commonJoin.value}".join([f"{filter_name} {commonCompare.value} @{param_name}" for (filter_name, filter_value), param_name in zip(filters_query, parameters) ])
+            
+            logger.info(f"Querying entities with filter:[{name_filter}]")
+            logger.info(f"With parameters: {parameters}")
+
+            entities = self.table_client.query_entities(query_filter=name_filter,
+                                                        parameters=parameters)
+
+            async for entity in entities:
+                results.append(self._strip_metadata(dict(entity)))
+            logger.info(f"Queried {len(results)} entities successfully.")
+        except Exception as e:
+            logger.error(f"Error querying entities from Table Storage: {e}")
+            traceback.print_exc()
+        return results
+
     async def delete_entity(self, partition_key: str, row_key: str) -> None:
         """Delete entity data from Azure Table Storage by entity ID."""
         try:
@@ -70,4 +99,11 @@ class TableStorageService(TableServiceInterface):
     def _strip_metadata(self, entity: dict) -> dict:
         """Remove Azure Table Storage metadata fields."""
         return {k: v for k, v in entity.items() if k not in AZURE_TABLE_METADATA_FIELDS}
-   
+
+    async def __aenter__(self) -> "TableStorageService":
+       """Enter the runtime context related to this object."""
+       return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+       """Exit the runtime context related to this object."""
+       await self.close()

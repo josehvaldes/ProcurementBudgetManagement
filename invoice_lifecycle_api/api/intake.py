@@ -29,18 +29,21 @@ class UploadRequestModel(BaseModel):
     source_email: EmailStr | None
     priority: str | None
     document_type: str | None # e.g., "invoice" or "receipt"
+    user_comments: str | None = None
     
 def upload_metadata_form(
     department_id: str = Form(...),
     source_email: str | None = Form(None),
     priority: str = Form("normal"),
-    document_type: str = Form("invoice")
+    document_type: str = Form("invoice"),
+    user_comments: str | None = Form(None)
 ) -> UploadRequestModel:
     return UploadRequestModel(
         department_id=department_id,
         source_email=source_email,
         priority=priority,
-        document_type=document_type
+        document_type=document_type,
+        user_comments=user_comments
     )
 
 @router.post("/upload-invoice")
@@ -62,8 +65,8 @@ async def intake(model:UploadRequestModel = Depends(upload_metadata_form),
             source_email=model.source_email,
             priority=model.priority,
             document_type=model.document_type,
-            line_items=[],
-            has_po=False
+            has_po=False,
+            user_comments=model.user_comments
         )
 
         invoice_id = await event_choreographer.handle_intake_event(invoice, uploadedFile)

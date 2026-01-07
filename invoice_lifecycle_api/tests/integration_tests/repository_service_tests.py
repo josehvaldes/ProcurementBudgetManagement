@@ -6,12 +6,13 @@ import traceback
 import uuid
 
 from shared.config.settings import settings
+from shared.models.vendor import Vendor
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.models.invoice import DocumentType, Invoice, InvoiceSource
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
-from invoice_lifecycle_api.application.interfaces.service_interfaces import StorageServiceInterface, TableServiceInterface
+from invoice_lifecycle_api.application.interfaces.service_interfaces import JoinOperator, StorageServiceInterface, TableServiceInterface
 
 setup_logging(
         log_level=settings.log_level,
@@ -22,7 +23,14 @@ logger = get_logger(__name__)
 
 class RepositoryServiceTests:
     def setup_method(self):
-        self.repository: TableServiceInterface = TableStorageService()
+        self.invoice_repository: TableServiceInterface = TableStorageService(
+            storage_account_url=settings.table_storage_account_url,
+            table_name=settings.invoices_table_name
+        )
+        self.vendor_repository: TableServiceInterface = TableStorageService(
+            storage_account_url=settings.table_storage_account_url,
+            table_name=settings.vendors_table_name
+        )
         self.blob_repository: StorageServiceInterface = InvoiceStorageService()
 
 
@@ -41,11 +49,10 @@ class RepositoryServiceTests:
             raw_file_blob_name="invoices/invoice.pdf",
             file_size=204800,
             file_uploaded_at=datetime.now(timezone.utc),
-            line_items=[],
             has_po=False
             )
         entity_dict = invoice.to_dict()
-        id = await self.repository.upsert_entity(entity_dict, invoice.department_id, invoice.invoice_id)
+        id = await self.invoice_repository.upsert_entity(entity_dict, invoice.department_id, invoice.invoice_id)
         print(f"Saved invoice : {entity_dict}")
         assert id is not None
     
@@ -88,7 +95,7 @@ class RepositoryServiceTests:
             partition_key = "dept_8d6014"
             row_key = "d7224a169011"
             print(f"Retrieving entity with Partition Key: {partition_key}, Row Key: {row_key}")
-            entity = await self.repository.get_entity(partition_key, row_key)
+            entity = await self.invoice_repository.get_entity(partition_key, row_key)
             invoice: Invoice = Invoice.from_dict(entity) if entity else None
             if invoice:
                 print(f"Retrieved entity: {invoice}")
@@ -99,10 +106,53 @@ class RepositoryServiceTests:
             traceback.print_exc()
 
     async def close_repositories(self):
-        await self.repository.close()
-        await self.blob_repository.close()
-        credential_manager = get_credential_manager()
-        await credential_manager.close()
+        
+        tasks = []
+
+        tasks.append(self.invoice_repository.close())
+        tasks.append(self.blob_repository.close())
+        tasks.append(self.vendor_repository.close())
+        tasks.append(get_credential_manager().close())
+
+        results = await asyncio.gather(*tasks)
+        logger.info("Closed all repository services and credential manager.")
+
+    async def test_query_entities_OR_size_2(self):
+        try:
+            filters = [("name", "Contoso Supplies"), ("name", "Adventure Logistics")]
+            entities = await self.vendor_repository.query_entities(filters, commonJoin=JoinOperator.OR)
+            for entity in entities:
+                vendor: Vendor = Vendor.from_dict(entity)
+                logger.info(f" - {vendor}")
+            assert len(entities) == 2
+        except Exception as e:
+            logger.error(f"Error querying entities: {e}")
+            traceback.print_exc()
+
+
+    async def test_query_entities_AND_size_1(self):
+        try:
+            filters = [("contact_name", "Carol Martinez"), ("name", "Adventure Logistics")]
+            entities = await self.vendor_repository.query_entities(filters, commonJoin=JoinOperator.AND)
+            for entity in entities:
+                vendor: Vendor = Vendor.from_dict(entity)
+                logger.info(f" - {vendor}")
+            assert len(entities) == 1
+        except Exception as e:
+            logger.error(f"Error querying entities: {e}")
+            traceback.print_exc()
+
+    async def test_query_entities(self):
+        try:
+            filters = [("name", "Contoso Supplies")]
+            entities = await self.vendor_repository.query_entities(filters)
+            for entity in entities:
+                vendor: Vendor = Vendor.from_dict(entity)
+                logger.info(f" - {vendor}")
+            assert len(entities) == 1
+        except Exception as e:
+            logger.error(f"Error querying entities: {e}")
+            traceback.print_exc()
 
 async def main():
     """Main async entry point for running tests."""
@@ -111,7 +161,7 @@ async def main():
 
     parser = argparse.ArgumentParser(description="Azure Storage Repository Service Tests")
     parser.add_argument("action", type=str, help="Action to perform: upsert, upload, download, delete, get_entity",
-                       choices=["upsert", "upload", "download", "delete", "get_entity"])
+                       choices=["upsert", "upload", "download", "delete", "get_entity", "query", "query_and_1", "query_or_2"])
     args = parser.parse_args()
     
     logger.info(f"Running test for action: {args.action}")
@@ -123,6 +173,9 @@ async def main():
         "download": test_instance.test_download_file,
         "delete": test_instance.test_delete_file,
         "get_entity": test_instance.test_get_entity,
+        "query": test_instance.test_query_entities,
+        "query_and_1": test_instance.test_query_entities_AND_size_1,
+        "query_or_2": test_instance.test_query_entities_OR_size_2,
     }
     
     # Run the selected test

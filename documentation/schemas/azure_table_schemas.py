@@ -117,14 +117,6 @@ INVOICES_SCHEMA = {
     "approved_date": "Optional[datetime]", # Approval timestamp
     "rejection_reason": "Optional[str]", # Why invoice was rejected
     
-    # ========== PAYMENT INFORMATION ==========
-    "payment_terms": "Optional[str]",  # net-30, net-60, etc.
-    "payment_scheduled_date": "Optional[datetime]", # When payment scheduled
-    "payment_batch_id": "Optional[str]", # Payment batch reference
-    "payment_completed_date": "Optional[datetime]", # When payment was made
-    "payment_method": "Optional[str]", # ACH, Wire, Check, etc.
-    "payment_reference": "Optional[str]", # Bank reference number
-    
     # ========== METADATA & TRACKING ==========
     "source": "str",                   # How invoice entered (email, api, upload)
     "source_email": "Optional[str]",   # Email address if from email
@@ -135,7 +127,6 @@ INVOICES_SCHEMA = {
     "notes": "Optional[str]",          # Free-form notes
     
     # ========== LINE ITEMS ==========
-    "line_items": "Optional[str]",     # JSON array - Individual line items
     "tax_amount": "Optional[float]",   # Total tax
     "subtotal": "Optional[float]",     # Amount before tax
     "shipping_amount": "Optional[float]", # Shipping/handling
@@ -338,13 +329,6 @@ BUDGETS_SCHEMA = {
     "period_start": "datetime",        # Budget period start
     "period_end": "datetime",          # Budget period end
     "current_period": "str",           # e.g., "Q4-2024", "Dec-2024"
-    
-    # ========== BUDGET ADJUSTMENTS ==========
-    "adjustments": "Optional[str]",    # JSON array - Budget amendments
-    "adjustment_total": "float",       # Sum of all adjustments
-    "original_allocation": "float",    # Allocation before adjustments
-    "last_adjustment_date": "Optional[datetime]",
-    "last_adjustment_by": "Optional[str]",
     
     # ========== SPENDING METRICS ==========
     "consumption_rate": "float",       # % of budget consumed (0-100)

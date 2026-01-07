@@ -8,11 +8,10 @@ from typing import Dict, Any
 from agents.base_agent import BaseAgent
 from agents.intake_agent.tools.invoice_analyzer_tool import InvoiceAnalyzerTool
 from agents.intake_agent.tools.qr_extractor import get_qr_info_from_bytes
+from shared.models.invoice import Invoice, InvoiceState
 from shared.utils.constants import InvoiceSubjects, SubscriptionNames
-from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService 
 from shared.config.settings import settings
-from shared.utils.convert import convert_to_table_entity
 
 from langsmith import traceable
 
@@ -60,35 +59,27 @@ class IntakeAgent(BaseAgent):
         if self.invoice_analyzer_tool:
             await self.invoice_analyzer_tool.close()
 
-        get_credential_manager().close()
-
     @traceable(name="intake_agent.process_invoice", tags=["intake", "agent"], metadata={"version": "1.0"})
-    async def process_invoice(self, invoice_id: str, message_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_invoice(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process invoice by extracting data from document.
         
         Args:
-            invoice_id: Invoice ID
             message_data: Message payload
             
         Returns:
             Result data for next state
         """
-        self.logger.info(f"Extracting data from invoice {invoice_id}")
         invoice_id = message_data["invoice_id"]
         department_id = message_data["department_id"]
-
-        self.logger.info(f"   * Extracting data from invoice: [{invoice_id}], department_id {department_id}")
+        self.logger.info(f"Extracting data from invoice: [{invoice_id}], department_id {department_id}")
         # Get invoice from storage
         invoice = await self.get_invoice(department_id, invoice_id)
 
         if not invoice:
             raise ValueError(f"Invoice {invoice_id} not found")
         
-        # TODO: Extract data using Document Intelligence
-        raw_file_url = invoice["raw_file_url"]
         document_type = invoice["document_type"]
-        self.logger.info(f"   * Extracting data from document URL: {raw_file_url}")
 
         document_bytes = await self.blob_storage_client.download_file(
             container_name=settings.blob_container_name,
@@ -98,26 +89,22 @@ class IntakeAgent(BaseAgent):
         if not document_bytes:
             raise ValueError(f"Document {invoice['raw_file_blob_name']} not found")
         
-        self.logger.info(f"   * Downloaded document bytes: {len(document_bytes)} bytes")
         if document_type.lower() == "invoice":
             invoice_extracted = await self.invoice_analyzer_tool.analyze_invoice_request(document_bytes)
         elif document_type.lower() == "receipt":
             invoice_extracted = await self.invoice_analyzer_tool.analyze_receipt_request(document_bytes)
 
-        self.logger.info(f"   * Extracted invoice data: {invoice_extracted}")
         invoice.update(invoice_extracted)
 
-        self.logger.info(f"   * Updated invoice with extracted data: {invoice}")
         qr_info_list = await get_qr_info_from_bytes(document_bytes)
         if qr_info_list:
-            self.logger.info(f"   * Found QR code info: {qr_info_list}")
+            self.logger.info(f"Found QR code info: {qr_info_list}")
             invoice["qr_codes_data"] = [ qr_info.data for qr_info in qr_info_list ]
 
-        # Update invoice with extracted data
-        invoice["state"] = "EXTRACTED"
-        # invoice.update(extracted_data)
-        invoice = convert_to_table_entity(invoice)
-        updated = await self.update_invoice(invoice)
+        invoice_obj = Invoice.from_dict(invoice)        
+        invoice_obj.state = InvoiceState.EXTRACTED
+        
+        updated = await self.update_invoice(invoice_obj.to_dict())
         if not updated:
             raise ValueError(f"Failed to update invoice {invoice_id}")
 
@@ -125,8 +112,8 @@ class IntakeAgent(BaseAgent):
             "invoice_id": invoice_id,
             "department_id": department_id,
             "event_type": "IntakeAgentGenerated",
-            "state": "EXTRACTED",
-            "extracted_at": message_data.get("timestamp"),
+            "state": InvoiceState.EXTRACTED.value,
+            "extracted_at": message_data.get("timestamp")
         }
     
     def get_next_subject(self) -> str:

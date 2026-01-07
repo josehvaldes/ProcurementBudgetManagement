@@ -133,9 +133,12 @@ class MessagingServiceTests:
 
 
     async def close_repositories(self):
-        await self.messaging_service.close()
-        credential_manager = get_credential_manager()
-        await credential_manager.close()
+        tasks = []
+        tasks.append(self.messaging_service.close())
+        tasks.append(get_credential_manager().close())
+        await asyncio.gather(*tasks)
+
+        logger.info("Closed all repository services and credential manager.")
 
 async def main():
     test_instance = MessagingServiceTests()
