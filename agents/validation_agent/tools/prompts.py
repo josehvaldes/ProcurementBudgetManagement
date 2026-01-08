@@ -15,9 +15,8 @@ class ValidationAgentPrompts:
         - Identify discrepancies in invoice amounts compared to historical averages for the same vendor.
         - Flag unusual invoice dates or patterns that deviate from normal business operations.
 
-
     Available tools:
-    2. get_invoices_by_vendor: Retrieve invoices by vendor name and invoice number
+    - get_invoices_by_vendor: Retrieve invoices by vendor name and invoice number
 
     Be thorough but efficient. Don't call unnecessary tools.
 

@@ -76,27 +76,6 @@ class ValidationAgent(BaseAgent):
     @traceable(name="validation_agent.process_invoice", tags=["validation", "agent"], metadata={"version": "1.0"})
     async def process_invoice(self, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Validate invoice against business rules.
-            Deterministc validations:
-                - Check invoice data completeness
-                - Check for duplicate invoices
-
-                if vendor in vendor list:
-                - Check vendor approval status
-                - Check approved vendor list
-                - Check spending authority limits
-                - Check contract compliance
-                - AI Model Review
-                
-                If not in vendor list:
-                - Flag for vendor review
-                - AI Model Review
-
-            AI Validations:
-                - Check for anomalies in invoice data
-                - Validate against historical invoice data
-                - Predict potential issues using ML models
-
         Args:
             message_data: Message payload
         Returns:
@@ -113,47 +92,45 @@ class ValidationAgent(BaseAgent):
         
         invoice_obj = Invoice.from_dict(invoice)
         
-        validation_errors = []
-        validation_warnings = []
-        
         # Validate deterministically
-        is_valid, messages, vendor = await self.deterministic_validation_tool.validate_invoice(invoice_obj)
+
+        deterministic_response = await self.deterministic_validation_tool.validate_invoice(invoice_obj)
 
         # all deterministic validations passed
         self.logger.info(f"Invoice {invoice_id} passed deterministic validation")
 
-        if is_valid == ValidationResult.VALID:
+        if deterministic_response.result == ValidationResult.VALID:
             # Fetch vendor details if available
-
-            if vendor is not None:
-                # Check AI validations with vendor info
-                is_valid, errors, warnings = await self.ai_validation_tool.ainvoke({
-                    "invoice": invoice_obj.to_dict(),
-                    "vendor": vendor.to_dict()
-                })
-                if not is_valid:
-                    self.logger.warning(f"Invoice {invoice_id} failed AI validation")
-                    invoice_obj.state = InvoiceState.FAILED
-                    validation_errors.extend(errors)
-                    validation_warnings.extend(warnings)
-                else:
-                    self.logger.info(f"Invoice {invoice_id} passed AI validation")
-                    invoice_obj.state = InvoiceState.VALIDATED
+            vendor = deterministic_response.matched_vendor
+            # Check AI validations with vendor info
+            ai_response = await self.ai_validation_tool.ainvoke({
+                "invoice": invoice_obj.to_dict(),
+                "vendor": vendor.to_dict()
+            })
+        
+            if not ai_response.passed:
+                self.logger.warning(f"Invoice {invoice_id} failed AI validation")
+                invoice_obj.state = InvoiceState.FAILED
             else:
-                invoice_obj.state = InvoiceState.MANUAL_REVIEW
-                #check AI validations without vendor info
+                self.logger.info(f"Invoice {invoice_id} passed AI validation")
+                invoice_obj.state = InvoiceState.VALIDATED
             
-            invoice_obj.validation_flags = validation_warnings if validation_warnings else []
-            invoice_obj.validation_errors = validation_errors if validation_errors else []
+            invoice_obj.validation_flags = ai_response.recommended_actions
+            invoice_obj.validation_errors = ai_response.errors
             invoice_obj.validation_passed = invoice_obj.state == InvoiceState.VALIDATED
-
+        
+        elif deterministic_response.result == ValidationResult.MANUAL_REVIEW:
+            self.logger.info(f"Invoice {invoice_id} requires manual review")
+            invoice_obj.state = InvoiceState.MANUAL_REVIEW
+            invoice_obj.validation_flags = []
+            invoice_obj.validation_errors = deterministic_response.messages
+            invoice_obj.validation_passed = False
+        
         else:
             self.logger.warning(f"Invoice {invoice_id} failed deterministic validation")
             invoice_obj.state = InvoiceState.FAILED
-            validation_errors.extend(messages)
-            validation_warnings.extend(warnings)
-            invoice_obj.validation_flags = validation_warnings if validation_warnings else []
-            invoice_obj.validation_errors = validation_errors if validation_errors else []
+            invoice_obj.validation_flags = []
+            invoice_obj.validation_errors = deterministic_response.messages
             invoice_obj.validation_passed = False
 
         # Update invoice state

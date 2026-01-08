@@ -11,7 +11,13 @@ logger = get_logger(__name__)
 class ValidationResult(str, Enum):
     VALID = "valid"
     INVALID = "invalid"
-    
+    MANUAL_REVIEW = "manual_review"
+
+class ValidationResponse:
+    def __init__(self, result: ValidationResult, messages: list[str], matched_vendor: Vendor = None):
+        self.result = result
+        self.messages = messages
+        self.matched_vendor = matched_vendor
 
 class DeterministicValidator:
     """Deterministic Validator for invoice data validation."""
@@ -20,16 +26,16 @@ class DeterministicValidator:
         self.vendor_table = vendor_table
         self.invoice_table = invoice_table
 
-    async def validate_invoice(self, invoice_data: Invoice) -> tuple[ValidationResult, list[str], Vendor]:
+    async def validate_invoice(self, invoice_data: Invoice) -> ValidationResponse:
         """Validate the invoice data against deterministic rules."""
         # 1. validate vendor_name
         vendor_name = invoice_data.vendor_name
         if vendor_name is None or vendor_name.strip() == "":
-            return ValidationResult.INVALID, ["Vendor name is missing in the invoice data"], None
+            return ValidationResponse(ValidationResult.INVALID, ["Vendor name is missing in the invoice data"])
 
         # 2. Validate duplicity vendor_name invoice_number
         if await self.has_duplicate(invoice_data):
-            return ValidationResult.INVALID, [f"Duplicate invoice found for invoice number {invoice_data.invoice_number} and vendor {vendor_name}"], []
+            return ValidationResponse(ValidationResult.INVALID, [f"Duplicate invoice found for invoice number {invoice_data.invoice_number} and vendor {vendor_name}"])
 
         # 3. Check for required fields
         required_fields = ["amount", "vendor_name", "invoice_number", "issued_date"]
@@ -40,12 +46,12 @@ class DeterministicValidator:
                 missing_fields.append(field)
 
         if missing_fields:
-            return ValidationResult.INVALID, [f"Missing required field: {field}" for field in missing_fields], None
+            return ValidationResponse(ValidationResult.INVALID, [f"Missing required field: {field}" for field in missing_fields])
 
         # 4. Validate amounts
         amount = invoice_data.amount
         if amount is None or amount < 0:
-            return ValidationResult.INVALID, ["Invoice amount must be a positive number"], None
+            return ValidationResponse(ValidationResult.INVALID, ["Invoice amount must be a positive number"])
 
         # 5. validate vendor approval status and contracts
         vendors_list = await self.vendor_table.query_entities(
@@ -55,36 +61,34 @@ class DeterministicValidator:
         if vendors_list and len(vendors_list) >= 0:
             vendor = vendors_list[0]
             if not vendor["active"]:
-                return ValidationResult.INVALID, [f"Vendor {vendor_name} is not active"], None
+                return ValidationResponse(ValidationResult.INVALID, [f"Vendor {vendor_name} is not active"])
             
             # Validate vendor contracts
             if vendor["contracts"] and len(vendor["contracts"]) > 0:
                 contracts_dicts = json.loads(vendor["contracts"]) if isinstance(vendor["contracts"], str) else {}
                 contracts = [VendorContract.from_dict(c) for c in contracts_dicts]
-                errors = []
-                warnings = []
-                is_contract_valid = self.validate_contracts(contracts, invoice_data, errors=errors, warnings=warnings)
-                logger.info(f"Contract validation for vendor {vendor_name} returned: {is_contract_valid}, errors: {errors}, warnings: {warnings}")
+                messages = []
+                is_contract_valid = self.validate_contracts(contracts, invoice_data, messages=messages)
+                logger.info(f"Contract validation for vendor {vendor_name} returned: {is_contract_valid}, errors: {messages}")
                 if not is_contract_valid:
-                    return ValidationResult.INVALID, errors.extend(warnings), None
+                    return ValidationResponse(ValidationResult.INVALID, messages)
             else:
                 pass
 
             if vendor["auto_approve"]:
                 auto_approve_limit = vendor.get("auto_approve_limit", None)
                 if auto_approve_limit is not None and amount > auto_approve_limit:
-                    return ValidationResult.INVALID, [f"Invoice amount {amount} exceeds auto-approve limit for vendor {vendor_name}"], None
+                    return ValidationResponse(ValidationResult.INVALID, [f"Invoice amount {amount} exceeds auto-approve limit for vendor {vendor_name}"])
 
             # check spend limit
             spend_limit = vendor.get("spend_limit", None)
             if spend_limit is not None and amount > spend_limit:
-                return ValidationResult.INVALID, [f"Invoice amount {amount} exceeds spend limit for vendor {vendor_name}"], None
+                return ValidationResponse(ValidationResult.INVALID, [f"Invoice amount {amount} exceeds spend limit for vendor {vendor_name}"])
 
-            return ValidationResult.VALID, [], vendor
+            return ValidationResponse(ValidationResult.VALID, [], Vendor.from_dict(vendor))
         else:
-            # Vendor not found. Skip vendor-specific validations
-            return ValidationResult.VALID, [f"Vendor {vendor_name} not found in the system; skipping vendor-specific validations"], None
-
+            # Vendor not found.
+            return ValidationResponse(ValidationResult.MANUAL_REVIEW, [f"Vendor not found in the system. Vendor Name: {vendor_name}"])
 
     async def has_duplicate(self, invoice: Invoice) -> bool:
         """Check if the invoice is a duplicate."""
@@ -118,10 +122,10 @@ class DeterministicValidator:
         logger.info(f"No duplicate invoice found: {invoice_number} from vendor {vendor_name}")
         return False
 
-    def validate_contracts(self, contracts: list[VendorContract], invoice_data: Invoice, errors: list[str], warnings: list[str]) -> bool:
+    def validate_contracts(self, contracts: list[VendorContract], invoice_data: Invoice, messages: list[str]) -> bool:
         """Validate invoice against vendor contracts."""
         if not contracts or len(contracts) == 0:
-            warnings.append(f"No contracts found for vendor {invoice_data.vendor_name}; skipping contract compliance check")
+            messages.append(f"No contracts found for vendor {invoice_data.vendor_name}; skipping contract compliance check")
             return True
 
         # Placeholder logic for contract compliance check
@@ -130,24 +134,23 @@ class DeterministicValidator:
         active_contracts = [contract for contract in contracts if contract.status == "active"]
         
         if not active_contracts:
-            warnings.append(f"No active contracts for vendor {invoice_data.vendor_name}; skipping contract compliance check")
+            messages.append(f"No active contracts for vendor {invoice_data.vendor_name}; skipping contract compliance check")
             return True
 
         for contract in active_contracts:
             if contract.contract_value and invoice_data.amount > contract.contract_value:
-                warnings.append(f"Invoice {invoice_data.invoice_number} exceeds contract value for vendor {invoice_data.vendor_name}")
+                messages.append(f"Invoice {invoice_data.invoice_number} exceeds contract value for vendor {invoice_data.vendor_name}")
                 compliant = False
             
             if contract.contract_start_date and invoice_data.issued_date < contract.contract_start_date:
-                warnings.append(f"Invoice {invoice_data.invoice_number} issued before contract start date for vendor {invoice_data.vendor_name}")
+                messages.append(f"Invoice {invoice_data.invoice_number} issued before contract start date for vendor {invoice_data.vendor_name}")
                 compliant = False
             if contract.contract_end_date and invoice_data.issued_date > contract.contract_end_date:
-                warnings.append(f"Invoice {invoice_data.invoice_number} issued after contract end date for vendor {invoice_data.vendor_name}")
+                messages.append(f"Invoice {invoice_data.invoice_number} issued after contract end date for vendor {invoice_data.vendor_name}")
                 compliant = False
-            
 
         if not compliant:
-            errors.append(f"Invoice {invoice_data.invoice_number} does not comply with vendor contracts")
+            messages.append(f"Invoice {invoice_data.invoice_number} does not comply with vendor contracts")
             return False
         
         logger.info(f"Invoice {invoice_data.invoice_number} complies with all vendor contracts for vendor {invoice_data.vendor_name}")
