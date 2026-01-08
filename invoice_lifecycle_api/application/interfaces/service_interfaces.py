@@ -32,7 +32,7 @@ class TableServiceInterface(ABC):
         pass
 
     @abstractmethod
-    async def query_entities(self, filters_query: list[tuple[str, str]], commonJoin: JoinOperator = JoinOperator.AND, commonCompare: CompareOperator = CompareOperator.EQUAL) -> list[dict]:
+    async def query_entities(self, filters_query: list[tuple[str, str]], join_operator: JoinOperator = JoinOperator.AND, compare_operator: CompareOperator = CompareOperator.EQUAL) -> list[dict]:
         """Query entities from the table storage."""
         pass
 

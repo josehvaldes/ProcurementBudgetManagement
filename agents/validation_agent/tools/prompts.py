@@ -17,7 +17,6 @@ class ValidationAgentPrompts:
 
 
     Available tools:
-    1. search_vendors_by_name: Search for vendors by name in the vendor table
     2. get_invoices_by_vendor: Retrieve invoices by vendor name and invoice number
 
     Be thorough but efficient. Don't call unnecessary tools.

@@ -29,18 +29,6 @@ class AgentDecisionOutcome:
     reasoning: Optional[str]
     recommended_actions: Optional[list[str]]
 
-@tool
-@traceable(name="search_vendors_by_name", tags=["ai", "vendor"])
-async def search_vendors_by_name(vendor_name: str) -> list[dict]:
-    """Search for vendors by name in the vendor table."""
-
-    vendor_table_client: TableStorageService
-    with TableStorageService(storage_account_url=settings.table_storage_account_url,
-                                 table_name=settings.vendors_table_name) as vendor_table_client:    
-        filters_query = [("name", vendor_name)]
-        vendor_entities = await vendor_table_client.query_entities(filters_query=filters_query)
-        
-        return vendor_entities
 
 @tool
 @traceable(name="get_invoices_by_vendor", tags=["ai", "invoice"])

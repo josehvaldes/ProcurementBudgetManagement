@@ -133,10 +133,13 @@ class BaseAgent(ABC):
                             description=str(e)
                         )
                     total_time = time.time() - start_time
-                    run.add_metadata({
-                        "total_latency_ms": total_time * 1000,
-                        "intent": self.agent_name,
-                    })
+                    if run:
+                        run.add_metadata({
+                            "total_latency_ms": total_time * 1000,
+                            "intent": self.agent_name,
+                        })
+                    else:
+                        self.logger.warning("No active LangSmith run found to add metadata.")
 
         except asyncio.CancelledError:
             self.logger.info(f"{self.agent_name} cancelled")

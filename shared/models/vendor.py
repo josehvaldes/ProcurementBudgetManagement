@@ -27,7 +27,10 @@ class VendorContract:
     terms: Optional[str] = None
     status: Optional[str] = None  # active, expired, terminated
 
-
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'VendorContract':
+        """Populate VendorContract fields from a dictionary."""
+        return cls(**data)
 
 @dataclass
 class BankAccount:
@@ -99,8 +102,8 @@ class Vendor:
     notes: Optional[str] = None
     
     # ========== METADATA ==========
-    created_date: datetime = field(default_factory=datetime.now(timezone.utc))
-    updated_date: datetime = field(default_factory=datetime.now(timezone.utc))
+    created_date: datetime = field(default_factory= lambda: datetime.now(timezone.utc))
+    updated_date: datetime = field(default_factory= lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = None
     updated_by: Optional[str] = None
 

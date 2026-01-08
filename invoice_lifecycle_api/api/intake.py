@@ -1,17 +1,12 @@
 """
 Health check endpoint.
 """
-import base64
 import traceback
-import uuid
 from fastapi import APIRouter, Depends
-from datetime import datetime, timezone
 from fastapi.responses import JSONResponse
 
 from fastapi import UploadFile, File, Form
-import shutil
 from pydantic import BaseModel, EmailStr
-
 
 from invoice_lifecycle_api.domain.uploaded_file_dto import UploadedFileDTO
 from shared.utils.logging_config import get_logger
@@ -29,14 +24,14 @@ class UploadRequestModel(BaseModel):
     source_email: EmailStr | None
     priority: str | None
     document_type: str | None # e.g., "invoice" or "receipt"
-    user_comments: str | None = None
+    user_comments: str | None
     
 def upload_metadata_form(
     department_id: str = Form(...),
     source_email: str | None = Form(None),
+    user_comments: str | None = Form(None),
     priority: str = Form("normal"),
-    document_type: str = Form("invoice"),
-    user_comments: str | None = Form(None)
+    document_type: str = Form("invoice"),    
 ) -> UploadRequestModel:
     return UploadRequestModel(
         department_id=department_id,
@@ -53,7 +48,7 @@ async def intake(model:UploadRequestModel = Depends(upload_metadata_form),
     """Endpoint to upload an invoice file along with metadata."""
 
     try:
-        logger.info(f"upload-invoice endpoint called for department {model.department_id}")
+        logger.info(f"upload-invoice endpoint called for department {model.department_id}, {model.user_comments}")
         
         file_content = await file.read()
         uploadedFile = UploadedFileDTO(file.filename, file.content_type, file_content)

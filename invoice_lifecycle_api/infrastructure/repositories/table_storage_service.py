@@ -52,7 +52,9 @@ class TableStorageService(TableServiceInterface):
             logger.error(f"Error retrieving entity from Table Storage: {e}")
             return None
 
-    async def query_entities(self, filters_query: list[tuple[str, str]], commonJoin: JoinOperator = JoinOperator.AND, commonCompare: CompareOperator = CompareOperator.EQUAL) -> list[dict]:
+    async def query_entities(self, filters_query: list[tuple[str, str]], 
+                             join_operator: JoinOperator = JoinOperator.AND, 
+                             compare_operator: CompareOperator = CompareOperator.EQUAL) -> list[dict]:
         """Query entities from Azure Table Storage using a filter string."""
         results = []
         try:
@@ -66,7 +68,7 @@ class TableStorageService(TableServiceInterface):
                     parameters[f"{field.lower()}{index}"] = value
                     index += 1
             
-            name_filter = f"{commonJoin.value}".join([f"{filter_name} {commonCompare.value} @{param_name}" for (filter_name, filter_value), param_name in zip(filters_query, parameters) ])
+            name_filter = f"{join_operator.value}".join([f"{filter_name} {compare_operator.value} @{param_name}" for (filter_name, filter_value), param_name in zip(filters_query, parameters) ])
             
             logger.info(f"Querying entities with filter:[{name_filter}]")
             logger.info(f"With parameters: {parameters}")

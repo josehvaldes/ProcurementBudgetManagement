@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 from langsmith import traceable
 from agents.base_agent import BaseAgent
 from agents.validation_agent.tools.agentic_validator import AgenticValidator
-from agents.validation_agent.tools.deterministic_validator import DeterministicValidator
+from agents.validation_agent.tools.deterministic_validator import DeterministicValidator, ValidationResult
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.invoice import Invoice, InvoiceState
 from shared.models.vendor import Vendor
@@ -43,11 +43,12 @@ class ValidationAgent(BaseAgent):
             table_name=settings.vendors_table_name
         )
 
-        self.deterministic_validation_tool = DeterministicValidator()
-
-        self.ai_validation_tool = AgenticValidator(
-            ai_model_client=None  # Placeholder for actual AI model client
+        self.deterministic_validation_tool = DeterministicValidator(
+            vendor_table=self.vendor_table_client,
+            invoice_table=self.invoice_table_client
         )
+
+        self.ai_validation_tool = AgenticValidator()
 
     def setup_signal_handlers(self):
         """setup signal handlers."""
@@ -112,68 +113,48 @@ class ValidationAgent(BaseAgent):
         
         invoice_obj = Invoice.from_dict(invoice)
         
-        if not invoice_obj:
-            raise ValueError(f"Failed to parse invoice data for {invoice_id}")
-        
         validation_errors = []
         validation_warnings = []
         
-        vendor_name = invoice_obj.vendor_name
-        if vendor_name is None or vendor_name.strip() == "":
-            # new vendor or missing vendor_id
-            self.logger.warning(f"Invoice {invoice_id} has no vendor_name; flagging for review")
-            invoice_obj.state = InvoiceState.FAILED
-        else:
-            self.logger.info(f"Invoice {invoice_id} has vendor_name {vendor_name}; performing validations")
-            # Perform duplicate check
-            is_duplicate = self.has_duplicate(invoice)
-            if is_duplicate:
-                self.logger.warning(f"Invoice {invoice_id} is a duplicate; flagging for review")
-                invoice_obj.state = InvoiceState.FAILED
-                validation_errors = ["Duplicate invoice detected"]
-            else:
-                # - Check vendor approval status
-                # - Validate amounts
-                # - Verify contract compliance
-                
-                vendors_list = await self.vendor_table_client.query_entities(
-                    filters_query=[("vendor_name", vendor_name)]
-                )
-                if vendors_list is None or len(vendors_list) == 0:
-                    self.logger.info(f"Invoice {invoice_id} vendor not found; flagging for review")
-                    invoice_obj.state = InvoiceState.MANUAL_REVIEW
-                    validation_warnings.append(f"Vendor not found: {vendor_name}")
-                    #do AI validation for unknown vendor
-                    self.ai_validation_tool.validate_without_vendor(invoice_obj, validation_errors, validation_warnings)
+        # Validate deterministically
+        is_valid, messages, vendor = await self.deterministic_validation_tool.validate_invoice(invoice_obj)
 
+        # all deterministic validations passed
+        self.logger.info(f"Invoice {invoice_id} passed deterministic validation")
+
+        if is_valid == ValidationResult.VALID:
+            # Fetch vendor details if available
+
+            if vendor is not None:
+                # Check AI validations with vendor info
+                is_valid, errors, warnings = await self.ai_validation_tool.ainvoke({
+                    "invoice": invoice_obj.to_dict(),
+                    "vendor": vendor.to_dict()
+                })
+                if not is_valid:
+                    self.logger.warning(f"Invoice {invoice_id} failed AI validation")
+                    invoice_obj.state = InvoiceState.FAILED
+                    validation_errors.extend(errors)
+                    validation_warnings.extend(warnings)
                 else:
-                    # found vendor; perform deterministic validations. Use first match
-                    vendor = Vendor.from_dict(vendors_list[0])
-                    is_valid, errors, warnings = self.deterministic_validation_tool.validate(invoice_obj, vendor)
-                    if not is_valid:
-                        self.logger.warning(f"Invoice {invoice_id} failed deterministic validation")
-                        invoice_obj.state = InvoiceState.FAILED
-                        validation_errors.extend(errors)
-                        validation_warnings.extend(warnings)
+                    self.logger.info(f"Invoice {invoice_id} passed AI validation")
+                    invoice_obj.state = InvoiceState.VALIDATED
+            else:
+                invoice_obj.state = InvoiceState.MANUAL_REVIEW
+                #check AI validations without vendor info
+            
+            invoice_obj.validation_flags = validation_warnings if validation_warnings else []
+            invoice_obj.validation_errors = validation_errors if validation_errors else []
+            invoice_obj.validation_passed = invoice_obj.state == InvoiceState.VALIDATED
 
-                    else:
-                        # all deterministic validations passed
-                        self.logger.info(f"Invoice {invoice_id} passed deterministic validation")
-                        # Check AI validations
-                        is_valid, errors, warnings = self.ai_validation_tool.validate_invoice(invoice_obj, vendor)
-                        if not is_valid:
-                            self.logger.warning(f"Invoice {invoice_id} failed AI validation")
-                            invoice_obj.state = InvoiceState.FAILED
-                            validation_errors.extend(errors)
-                            validation_warnings.extend(warnings)
-                        else:
-                            self.logger.info(f"Invoice {invoice_id} passed AI validation")
-                            invoice_obj.state = InvoiceState.VALIDATED
-
-        
-        invoice_obj.validation_flags = validation_warnings if validation_warnings else []
-        invoice_obj.validation_errors = validation_errors if validation_errors else []
-        invoice_obj.validation_passed = invoice_obj.state == InvoiceState.VALIDATED
+        else:
+            self.logger.warning(f"Invoice {invoice_id} failed deterministic validation")
+            invoice_obj.state = InvoiceState.FAILED
+            validation_errors.extend(messages)
+            validation_warnings.extend(warnings)
+            invoice_obj.validation_flags = validation_warnings if validation_warnings else []
+            invoice_obj.validation_errors = validation_errors if validation_errors else []
+            invoice_obj.validation_passed = False
 
         # Update invoice state
         await self.update_invoice(invoice_obj.to_dict())
@@ -189,26 +170,6 @@ class ValidationAgent(BaseAgent):
         """Return the next message subject."""
         return InvoiceSubjects.VALIDATED
 
-    def has_duplicate(self, invoice: Invoice) -> bool:
-        """Check if the invoice is a duplicate."""
-        # Placeholder logic for duplicate check
-        invoice_number = invoice.invoice_number
-        vendor_name = invoice.vendor_name
-        self.logger.info(f"Checking for duplicate invoice: {invoice_number} from vendor {vendor_name} (ID: {invoice_number})")
-
-        entities = self.invoice_table_client.query_entities(
-            filters_query=[
-                ("invoice_number", invoice_number),
-                ("vendor_name", vendor_name)
-            ]
-        )
-
-        if entities and len(entities) > 0:
-            self.logger.warning(f"Duplicate invoice found: {invoice_number} from vendor {vendor_name}")
-            return True
-
-        # No duplicate found
-        return False
 
 if __name__ == "__main__":
     agent = ValidationAgent()

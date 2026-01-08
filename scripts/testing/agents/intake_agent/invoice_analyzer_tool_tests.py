@@ -3,7 +3,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, Mock, mock_open, patch
 from agents.intake_agent.tools.invoice_analyzer_tool import InvoiceAnalyzerTool
 
-class TestInvoiceAnalyzerTool:
+class InvoiceAnalyzerToolTest:
     """Unit tests for InvoiceAnalyzerTool with mocked external dependencies."""
 
     @pytest.fixture

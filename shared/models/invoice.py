@@ -65,13 +65,13 @@ class Invoice:
     # ========== DATES ==========
     issued_date: Optional[datetime] = None  # When vendor issued invoice
     due_date: Optional[datetime] = None
-    created_date: datetime = field(default_factory=datetime.now(timezone.utc))
-    updated_date: datetime = field(default_factory=datetime.now(timezone.utc))
+    created_date: datetime = field(default_factory= lambda: datetime.now(timezone.utc))
+    updated_date: datetime = field(default_factory= lambda: datetime.now(timezone.utc))
 
     # ========== STATE & WORKFLOW ==========
     state: InvoiceState = InvoiceState.CREATED
     previous_state: Optional[InvoiceState] = None
-    state_changed_at: datetime = field(default_factory=datetime.now(timezone.utc))
+    state_changed_at: datetime = field(default_factory= lambda: datetime.now(timezone.utc))
     state_changed_by: Optional[str] = None  # Agent or user who changed state
     
     # ========== DOCUMENT & EXTRACTION ==========
