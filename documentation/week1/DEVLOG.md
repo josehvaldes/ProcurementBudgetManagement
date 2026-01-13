@@ -259,7 +259,7 @@ Blob Storage Tests: ⭐
   - ✅ All running on local machine
   - ✅ Connected to Azure Service Bus and Blob Storage in cloud
 - ✅ Add comprehensive logging for debugging
-- [pending] Create helper script to monitor Service Bus queues and Blob Storage
+- ✅ Create helper script to monitor Service Bus queues and Blob Storage
 
 ### Success Criteria
 - ✅ Invoice flows from CREATED → EXTRACTED → VALIDATED

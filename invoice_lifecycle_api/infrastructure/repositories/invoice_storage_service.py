@@ -10,13 +10,14 @@ logger = get_logger(__name__)
 
 class InvoiceStorageService(StorageServiceInterface):
 
-    def __init__(self):
+    def __init__(self, standalone: bool = False):
+        self.standalone = standalone
         self.account_url = settings.blob_storage_account_url
         self.container_name = settings.blob_container_name
-        credential_manager = get_credential_manager()        
+        self.credential_manager = get_credential_manager()        
         self.blob_service_client = BlobServiceClient(
             account_url=self.account_url,
-            credential=credential_manager.get_credential()
+            credential=self.credential_manager.get_credential()
         )
 
         self.container_client = self.blob_service_client.get_container_client(container=self.container_name)
@@ -45,6 +46,11 @@ class InvoiceStorageService(StorageServiceInterface):
         _ = await data.readinto(stream)
         return stream.getvalue()
 
+    async def file_exists(self, container_name: str, blob_name: str) -> bool:
+        """Check if file exists in storage."""
+        blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+        return await blob_client.exists()
+
     async def delete_file(self, container_name: str, blob_name: str) -> None:
         """Delete file from storage."""
         blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=blob_name)
@@ -59,6 +65,10 @@ class InvoiceStorageService(StorageServiceInterface):
         if self.blob_service_client:
             await self.blob_service_client.close()
             logger.info("Blob Storage client closed.")
+        
+        if self.standalone:
+            await self.credential_manager.close()
+            logger.info("Credential manager closed.")
 
     async def __aenter__(self):
         """Enter async context manager."""

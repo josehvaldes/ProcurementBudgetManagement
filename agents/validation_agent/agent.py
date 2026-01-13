@@ -150,5 +150,6 @@ class ValidationAgent(BaseAgent):
 
 if __name__ == "__main__":
     agent = ValidationAgent()
-    agent.initialize()
-    agent.run()
+    agent.setup_signal_handlers()
+    asyncio.run(agent.run())
+

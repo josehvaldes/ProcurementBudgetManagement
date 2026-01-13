@@ -14,6 +14,7 @@ from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service
 from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
+from shared.models.invoice import InvoiceState
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.config.settings import settings
 
@@ -179,11 +180,13 @@ class BaseAgent(ABC):
 
             # Publish next state message if processing succeeded
 
-            if result is not None and result["state"] not in ["FAILED", "MANUAL_REVIEW"]:
+            if result is not None and result["state"] == InvoiceState.VALIDATED.value:
                 await self._publish_next_state(invoice_id, result)
-
                 self.logger.info(f"Successfully processed invoice {invoice_id}")
                 return True
+            elif result is not None and result["state"] == InvoiceState.MANUAL_REVIEW.value:
+                self.logger.info(f"Processed invoice {invoice_id} requiring manual review")
+                return False
             else:
                 self.logger.warning(f"Processing of invoice {invoice_id} did not complete successfully; no next state published.")
                 return False

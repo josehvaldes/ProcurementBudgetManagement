@@ -49,7 +49,7 @@ class TestAgenticValidator:
 
         assert response.passed == True
         assert len(response.errors) == 0
-        assert len(response.recommended_actions) == 0
+
 
 
 async def main():

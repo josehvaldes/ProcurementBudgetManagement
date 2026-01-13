@@ -55,7 +55,6 @@ class StorageServiceInterface(ABC):
         """Upload file bytes to storage and return the file URL."""
         pass
 
-
     @abstractmethod
     async def upload_file(self, file_path: str, blob_name: str) -> str:
         """Upload file to storage and return the file URL."""
@@ -64,6 +63,11 @@ class StorageServiceInterface(ABC):
     @abstractmethod
     async def download_file(self, container_name: str, blob_name: str) -> bytes | None:
         """Download file from storage."""
+        pass
+
+    @abstractmethod
+    async def file_exists(self, container_name: str, blob_name: str) -> bool:
+        """Check if file exists in storage."""
         pass
 
     @abstractmethod

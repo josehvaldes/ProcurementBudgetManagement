@@ -16,9 +16,10 @@ AZURE_TABLE_METADATA_FIELDS = {'PartitionKey', 'RowKey', 'Timestamp', 'etag', 'o
 
 class TableStorageService(TableServiceInterface):
 
-    def __init__(self, storage_account_url, table_name):
+    def __init__(self, storage_account_url, table_name, standalone: bool = False):
         self.account_url = storage_account_url
         self.table_name = table_name
+        self.standalone = standalone
 
         credential_manager = get_credential_manager()
         self.table_client = TableClient(
@@ -29,7 +30,6 @@ class TableStorageService(TableServiceInterface):
 
     async def upsert_entity(self, entity: dict, partition_key: str, row_key: str) -> str:
         """Save an entity to the Azure Table Storage."""
-        logger.info("Saving entity to Azure Table Storage...")
         try:
             entity["PartitionKey"] = partition_key
             entity["RowKey"] = row_key
@@ -70,15 +70,14 @@ class TableStorageService(TableServiceInterface):
             
             name_filter = f"{join_operator.value}".join([f"{filter_name} {compare_operator.value} @{param_name}" for (filter_name, filter_value), param_name in zip(filters_query, parameters) ])
             
-            logger.info(f"Querying entities with filter:[{name_filter}]")
-            logger.info(f"With parameters: {parameters}")
+            logger.info(f"Querying entities with filter:[{name_filter}]. Parameters: {parameters}")
 
             entities = self.table_client.query_entities(query_filter=name_filter,
                                                         parameters=parameters)
 
             async for entity in entities:
                 results.append(self._strip_metadata(dict(entity)))
-            logger.info(f"Queried {len(results)} entities successfully.")
+            logger.info(f"Queried {len(results)} entities successfully. filter:[{name_filter}]. Parameters: {parameters}")
         except Exception as e:
             logger.error(f"Error querying entities from Table Storage: {e}")
             traceback.print_exc()
@@ -97,6 +96,11 @@ class TableStorageService(TableServiceInterface):
         if self.table_client:
             await self.table_client.close()
             logger.info("Table Storage client closed.")
+        
+        if self.standalone:
+            credential_manager = get_credential_manager()
+            await credential_manager.close()
+            logger.info("Credential manager closed.")
 
     def _strip_metadata(self, entity: dict) -> dict:
         """Remove Azure Table Storage metadata fields."""
