@@ -292,3 +292,50 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
 ```
 
 ---
+
+## Week 3: Budget Tracking System
+**Goal:** Implement budget management, allocation logic, and tracking agent
+
+### Key Deliverables
+- Budget data model and allocation structure
+- Budget Tracking Agent with real-time calculation **running locally**
+- Budget consumption monitoring and forecasting
+- Over-budget detection and alerting
+- Budget management API endpoints
+
+### Tasks
+- ✅ Design budget allocation hierarchy (departments, projects, categories)
+- ✅ Implement Budgets table with fiscal year partitioning
+- ✅ Seed Budgets table with test data
+- ✅ Set up Budget Agent Service Bus subscription
+  - Create receiver for budget-agent-subscription
+  - Implement message pulling loop
+- Build Budget Tracking Agent with LangChain
+  - Create tools for budget lookup
+  - Implement budget allocation logic
+  - Build consumption tracking
+  - Add forecasting logic (linear regression)
+  - Implement over-budget detection
+  - Publish message with subject='invoice.budget_checked'
+- Create API endpoints for budget management (CRUD)
+  - GET /budgets/{department}/{category}
+  - GET /budgets/{department}/{project}/{category}
+  - POST /budgets (create new budget allocation)
+  - PUT /budgets/{id} (update allocation)
+  - GET /budgets/consumption (real-time consumption report)
+- Implement budget vs. actual comparison logic
+- Build alerting system for budget thresholds
+  - Email notifications for over-budget
+  - Slack/Teams webhooks (optional)
+- Create budget dashboard queries
+- Test budget allocation and tracking flows locally
+
+### Success Criteria
+- ✅ Invoices properly allocated to budgets
+- ✅ Real-time budget consumption calculated accurately
+- ✅ Over-budget scenarios flagged correctly
+- ✅ Budget forecasting generates insights
+- ✅ API endpoints return correct budget data
+- ✅ Budget Agent runs locally and processes messages
+
+---

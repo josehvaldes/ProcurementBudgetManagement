@@ -12,7 +12,7 @@ class Metadata(BaseModel):
     total_token:int
 
 
-class AgenticResponse(BaseModel):
+class ValidatorAgenticResponse(BaseModel):
     """Standardized response model for agentic interactions."""
     response: str
     metadata: Metadata

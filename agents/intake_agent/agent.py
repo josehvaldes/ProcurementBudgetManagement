@@ -3,7 +3,6 @@ Intake Agent - Extracts data from invoice documents using Azure Document Intelli
 """
 
 import asyncio
-import signal
 from typing import Dict, Any
 from agents.base_agent import BaseAgent
 from agents.intake_agent.tools.invoice_analyzer_tool import InvoiceAnalyzerTool
@@ -34,22 +33,6 @@ class IntakeAgent(BaseAgent):
 
         self.blob_storage_client = InvoiceStorageService()
         self.invoice_analyzer_tool = InvoiceAnalyzerTool()
-
-    def setup_signal_handlers(self):
-        """setup signal handlers."""
-        print("Setting up signal handlers...")
-        def handle_signal(sig, frame):
-            sig_name = signal.Signals(sig).name
-            self.logger.info(f"\n🛑 Received {sig_name}, initiating shutdown...")
-            self.shutdown_event.set() 
-
-        # Handle Ctrl+C (SIGINT) and kill command (SIGTERM)
-        signal.signal(signal.SIGINT, handle_signal)
-        signal.signal(signal.SIGTERM, handle_signal)
-        
-        # On Windows, also handle SIGBREAK (Ctrl+Break)
-        if hasattr(signal, 'SIGBREAK'):
-            signal.signal(signal.SIGBREAK, handle_signal)
 
     async def release_resources(self) -> None:
         """Release any resources held by the agent."""
@@ -118,7 +101,7 @@ class IntakeAgent(BaseAgent):
     
     def get_next_subject(self) -> str:
         """Return the next message subject."""
-        return InvoiceSubjects.EXTRACTED
+        return InvoiceSubjects.EXTRACTED.value
 
 if __name__ == "__main__":
     agent = IntakeAgent()

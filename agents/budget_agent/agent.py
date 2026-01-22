@@ -2,10 +2,15 @@
 Budget Agent - Tracks and validates budget allocations.
 """
 
+import asyncio
 from typing import Dict, Any, Optional
-from agents.base_agent import BaseAgent
-from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from langsmith import traceable
 
+from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
+from shared.config.settings import settings
+from agents.base_agent import BaseAgent
+from shared.models.invoice import InvoiceState
+from shared.utils.constants import InvoiceSubjects, SubscriptionNames
 
 class BudgetAgent(BaseAgent):
     """
@@ -20,13 +25,20 @@ class BudgetAgent(BaseAgent):
     - Publish invoice.budget_checked message
     """
     
-    def __init__(self):
+    def __init__(self, shutdown_event: asyncio.Event = asyncio.Event()):
         super().__init__(
             agent_name="BudgetAgent",
-            subscription_name=SubscriptionNames.BUDGET_AGENT
+            subscription_name=SubscriptionNames.BUDGET_AGENT,
+            shutdown_event=shutdown_event
         )
-    
-    def process_invoice(self, invoice_id: str, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+
+        self.budget_table_client = TableStorageService(
+            storage_account_url=settings.table_storage_account_url,
+            table_name=settings.budgets_table_name
+        )
+
+    @traceable(name="budget_agent.process_invoice", tags=["budget", "agent"], metadata={"version": "1.0"})
+    async def process_invoice(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Check budget availability for invoice.
         
@@ -37,12 +49,28 @@ class BudgetAgent(BaseAgent):
         Returns:
             Result data for next state
         """
-        self.logger.info(f"Checking budget for invoice {invoice_id}")
-        
+        invoice_id = message_data["invoice_id"]
+        department_id = message_data["department_id"]
+        category = message_data["category"]
+        project_id = message_data.get("project_id", "GEN-0")
+
+        compound_key = f"{department_id}:{project_id}:{category}"
+        budget_year = message_data.get("budget_year", "FY2024")
+
+        self.logger.info(f"Extracting data from invoice: [{invoice_id}], department_id {department_id}, project_id {project_id}, category {category}")
         # Get invoice from storage
-        invoice = self.get_invoice(invoice_id)
+        invoice = await self.get_invoice(department_id, invoice_id)
+
         if not invoice:
             raise ValueError(f"Invoice {invoice_id} not found")
+
+        budget_filters = [
+            ("PartitionKey", budget_year),
+            ("RowKey", f"{compound_key}"),
+        ]
+        budget = await self.budget_table_client.query_entities(
+            filters_query=budget_filters
+        )
         
         # TODO: Implement budget checking logic
         # - Get budget allocation for department/project
@@ -62,17 +90,27 @@ class BudgetAgent(BaseAgent):
         
         return {
             "invoice_id": invoice_id,
-            "state": "BUDGET_CHECKED",
+            "department_id": department_id,
+            "event_type": "BudgetAgentGenerated",
+            "state": InvoiceState.BUDGET_CHECKED.value,
             "budget_available": budget_available,
             "budget_warnings": budget_warnings,
         }
     
     def get_next_subject(self) -> str:
         """Return the next message subject."""
-        return InvoiceSubjects.BUDGET_CHECKED
+        return InvoiceSubjects.BUDGET_CHECKED.value
+
+
+    async def release_resources(self):
+        """Release any resources held by the agent."""
+        self.logger.info(f"Releasing resources for {self.agent_name}...")
+        if self.budget_table_client:
+            await self.budget_table_client.close()
 
 
 if __name__ == "__main__":
     agent = BudgetAgent()
-    agent.initialize()
-    agent.run()
+    agent.setup_signal_handlers()
+    asyncio.run(agent.run())
+

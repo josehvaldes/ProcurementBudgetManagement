@@ -25,7 +25,12 @@ class TableServiceInterface(ABC):
     async def upsert_entity(self, entity, partition_key: str, row_key: str) -> str:
         """Upsert an entity in the table storage."""
         pass
-
+    
+    @abstractmethod
+    async def query_compound_key(self, partition_key: str, row_key: str) -> list[dict]:
+        """Query entity from the table storage using PartitionKey and RowKey."""
+        pass
+    
     @abstractmethod
     async def get_entity(self, partition_key: str, row_key: str) -> dict | None:
         """Retrieve entity by ID."""

@@ -11,7 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from agents.validation_agent.tools.prompts import ValidationAgentPrompts
 from invoice_lifecycle_api.application.interfaces.service_interfaces import JoinOperator
-from shared.models.agentic import Metadata, AgenticResponse
+from shared.models.agentic import Metadata, ValidatorAgenticResponse
 from shared.models.invoice import Invoice
 from shared.models.vendor import Vendor
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
@@ -71,7 +71,7 @@ class AgenticValidator:
                 azure_ad_token_provider=token_provider,
                 temperature=0.1
         )
-        self.agent = None
+        self.agent = self._get_agent()
         
     async def _get_agent(self):
         agent = create_agent (
@@ -83,7 +83,7 @@ class AgenticValidator:
             )
         return agent
 
-    async def ainvoke(self, input:dict) -> AgenticResponse:
+    async def ainvoke(self, input:dict) -> ValidatorAgenticResponse:
         """
         Validate invoice with vendor information using AI model.
         Append any errors or warnings to the provided lists.
@@ -105,9 +105,6 @@ class AgenticValidator:
             return False, errors, []
         
         try:
-            
-            if self.agent is None:
-                self.agent = await self._get_agent()
 
             print("Invoking agent for validation...")
             result = await self.agent.ainvoke({
@@ -135,7 +132,7 @@ class AgenticValidator:
             response_dict = json.loads(response)
             print(f"Response Dict: {response_dict}")
 
-            agentic_response = AgenticResponse(
+            agentic_response = ValidatorAgenticResponse(
                 passed=response_dict["validation_passed"] and response_dict["vendor_matched"],
                 response=response,
                 errors= response_dict.get("validation_flags", []),

@@ -7,10 +7,8 @@ import traceback
 import uuid
 
 from shared.config.settings import settings
-from shared.models.vendor import Vendor
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.models.invoice import DocumentType, Invoice, InvoiceSource
-from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
 from invoice_lifecycle_api.application.interfaces.service_interfaces import JoinOperator, StorageServiceInterface, TableServiceInterface
@@ -22,15 +20,12 @@ setup_logging(
     )
 logger = get_logger(__name__)
 
-class RepositoryServiceTests:
+class InvoiceRepositoryTests:
     def setup_method(self):
         self.invoice_repository: TableServiceInterface = TableStorageService(
             storage_account_url=settings.table_storage_account_url,
-            table_name=settings.invoices_table_name
-        )
-        self.vendor_repository: TableServiceInterface = TableStorageService(
-            storage_account_url=settings.table_storage_account_url,
-            table_name=settings.vendors_table_name
+            table_name=settings.invoices_table_name,
+            standalone=True
         )
         self.blob_repository: StorageServiceInterface = InvoiceStorageService()
 
@@ -118,16 +113,6 @@ class RepositoryServiceTests:
                 f.write(json.dumps(entity, indent=4, default=str))
             logger.info(f"Entity saved to file: {file_path}")
 
-            # vendor
-            vendor_file_path = "./scripts/poc/sample_documents/vendor_entity.json"
-            vendor_partition_key = "VENDOR"
-            vendor_row_key = "4eda3a25a6b9"
-            logger.info(f"Saving vendor entity to file: {vendor_partition_key}, Row Key: {vendor_row_key}")
-            vendor_entity = await self.vendor_repository.get_entity(vendor_partition_key, vendor_row_key)
-            with open(vendor_file_path, "w") as f:
-                f.write(json.dumps(vendor_entity, indent=4, default=str))
-            logger.info(f"Vendor entity saved to file: {vendor_file_path}")
-
         except Exception as e:
             logger.error(f"Error saving entity to file: {e}")
             traceback.print_exc()
@@ -138,57 +123,22 @@ class RepositoryServiceTests:
 
         tasks.append(self.invoice_repository.close())
         tasks.append(self.blob_repository.close())
-        tasks.append(self.vendor_repository.close())
-        tasks.append(get_credential_manager().close())
 
         results = await asyncio.gather(*tasks)
         logger.info("Closed all repository services and credential manager.")
 
-    async def test_query_entities_OR_size_2(self):
-        try:
-            filters = [("name", "Contoso Supplies"), ("name", "Adventure Logistics")]
-            entities = await self.vendor_repository.query_entities(filters, join_operator=JoinOperator.OR)
-            for entity in entities:
-                vendor: Vendor = Vendor.from_dict(entity)
-                logger.info(f" - {vendor}")
-            assert len(entities) == 2
-        except Exception as e:
-            logger.error(f"Error querying entities: {e}")
-            traceback.print_exc()
+    async def teardown_method(self):
+        await self.close_repositories()
 
-
-    async def test_query_entities_AND_size_1(self):
-        try:
-            filters = [("contact_name", "Carol Martinez"), ("name", "Adventure Logistics")]
-            entities = await self.vendor_repository.query_entities(filters, join_operator=JoinOperator.AND)
-            for entity in entities:
-                vendor: Vendor = Vendor.from_dict(entity)
-                logger.info(f" - {vendor}")
-            assert len(entities) == 1
-        except Exception as e:
-            logger.error(f"Error querying entities: {e}")
-            traceback.print_exc()
-
-    async def test_query_entities(self):
-        try:
-            filters = [("name", "Contoso Supplies")]
-            entities = await self.vendor_repository.query_entities(filters)
-            for entity in entities:
-                vendor: Vendor = Vendor.from_dict(entity)
-                logger.info(f" - {vendor}")
-            assert len(entities) == 1
-        except Exception as e:
-            logger.error(f"Error querying entities: {e}")
-            traceback.print_exc()
 
 async def main():
     """Main async entry point for running tests."""
-    test_instance = RepositoryServiceTests()
+    test_instance = InvoiceRepositoryTests()
     test_instance.setup_method()
 
     parser = argparse.ArgumentParser(description="Azure Storage Repository Service Tests")
-    parser.add_argument("action", type=str, help="Action to perform: upsert, upload, download, delete, get_entity",
-                       choices=["upsert", "upload", "download", "delete", "get_entity", "query", "query_and_1", "query_or_2", "save"])
+    parser.add_argument("action", type=str, help="Action to perform: upsert, upload, download, delete, get_entity, save",
+                       choices=["upsert", "upload", "download", "delete", "get_entity", "save"])
     args = parser.parse_args()
     
     logger.info(f"Running test for action: {args.action}")
@@ -200,9 +150,6 @@ async def main():
         "download": test_instance.test_download_file,
         "delete": test_instance.test_delete_file,
         "get_entity": test_instance.test_get_entity,
-        "query": test_instance.test_query_entities,
-        "query_and_1": test_instance.test_query_entities_AND_size_1,
-        "query_or_2": test_instance.test_query_entities_OR_size_2,
         "save": test_instance.save_to_file_entity,
     }
     

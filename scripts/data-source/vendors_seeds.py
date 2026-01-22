@@ -4,7 +4,6 @@ import asyncio
 from datetime import datetime, timezone
 import uuid
 
-from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from shared.config.settings import settings
 from shared.models.vendor import Vendor
 from shared.utils.logging_config import get_logger, setup_logging
@@ -21,7 +20,8 @@ logger = get_logger(__name__)
 json_filename = "scripts/data-source/vendors.json"
 
 vendor_table_client = TableStorageService(storage_account_url=settings.table_storage_account_url,
-                                           table_name=settings.vendors_table_name)
+                                           table_name=settings.vendors_table_name,
+                                           standalone=True)
 
 async def seed_vendors(vendor_table_client, vendors: list[Vendor]):
     """Seed vendors into the vendor table storage."""
@@ -62,9 +62,6 @@ async def close_clients():
     """Close any open clients."""
     if vendor_table_client:
         await vendor_table_client.close()
-
-    await get_credential_manager().close()
-
 
 async def main():
    

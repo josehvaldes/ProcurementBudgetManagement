@@ -1,5 +1,5 @@
 import traceback
-import uuid
+from enum import Enum
 from azure.data.tables.aio import TableClient
 
 from shared.utils.logging_config import get_logger
@@ -12,7 +12,10 @@ logger = get_logger(__name__)
 
 AZURE_TABLE_METADATA_FIELDS = {'PartitionKey', 'RowKey', 'Timestamp', 'etag', 'odata.etag', 'odata.metadata'}
 
-
+class CompoundKeyStructure(str, Enum):
+    LOWER_BOUND = ":"
+    UPPER_BOUND = ";"
+    
 
 class TableStorageService(TableServiceInterface):
 
@@ -51,6 +54,37 @@ class TableStorageService(TableServiceInterface):
         except Exception as e:
             logger.error(f"Error retrieving entity from Table Storage: {e}")
             return None
+
+    async def query_compound_key(self, partition_key: str, row_key: str) -> list[dict]:
+        """Query entity from Azure Table Storage using PartitionKey and RowKey."""
+        try:
+            filter_query = "PartitionKey eq @partition_key and RowKey ge @lower and RowKey lt @upper"
+            parameters = {
+                "partition_key": partition_key,
+                "lower": row_key,
+                "upper": row_key + CompoundKeyStructure.UPPER_BOUND.value  # Upper bound is exclusive
+            }
+
+            logger.info(f"Querying entity with PartitionKey: {partition_key}, RowKey: {row_key}")
+
+            entities = self.table_client.query_entities(query_filter=filter_query,
+                                                        parameters=parameters)
+
+            results = []
+            async for entity in entities:
+                logger.info(f"Entity queried successfully. Row Key: {row_key}")
+                results.append(self._strip_metadata(dict(entity)))
+
+            if not results:
+                logger.info(f"No entity found with PartitionKey: {partition_key}, RowKey: {row_key}")
+                return []
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Error querying entity from Table Storage: {e}")
+            traceback.print_exc()
+            return []
 
     async def query_entities(self, filters_query: list[tuple[str, str]], 
                              join_operator: JoinOperator = JoinOperator.AND, 

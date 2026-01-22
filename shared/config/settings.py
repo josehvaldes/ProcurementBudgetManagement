@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     invoices_table_name: str = "invoices"
     vendors_table_name: str = "vendors"
     budgets_table_name: str = "budgets"
+    budget_analytics_table_name: str = "budgetanalytics"
     
     # Azure Document Intelligence
     document_intelligence_endpoint: str = ""

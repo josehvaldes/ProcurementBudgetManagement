@@ -2,6 +2,7 @@
 Base agent class for invoice processing agents.
 """
 import asyncio
+import signal
 from langsmith import traceable
 from langsmith.run_helpers import get_current_run_tree
 import time
@@ -77,6 +78,22 @@ class BaseAgent(ABC):
 
         self.logger.info(f"{self.agent_name} initialized successfully")
     
+    def setup_signal_handlers(self):
+        """setup signal handlers."""
+        print("Setting up signal handlers...")
+        def handle_signal(sig, frame):
+            sig_name = signal.Signals(sig).name
+            self.logger.info(f"\n🛑 Received {sig_name}, initiating shutdown...")
+            self.shutdown_event.set() 
+
+        # Handle Ctrl+C (SIGINT) and kill command (SIGTERM)
+        signal.signal(signal.SIGINT, handle_signal)
+        signal.signal(signal.SIGTERM, handle_signal)
+        
+        # On Windows, also handle SIGBREAK (Ctrl+Break)
+        if hasattr(signal, 'SIGBREAK'):
+            signal.signal(signal.SIGBREAK, handle_signal)
+
     async def close(self) -> None:
         """Close agent resources."""
         self.logger.info(f"Closing {self.agent_name} clients...")
@@ -89,10 +106,6 @@ class BaseAgent(ABC):
         
         await get_credential_manager().close()
         
-    @abstractmethod
-    async def release_resources(self) -> None:
-        """Release any resources held by the agent."""
-
     async def run(self) -> None:
         """
         Main agent run loop.
@@ -218,6 +231,14 @@ class BaseAgent(ABC):
             Message subject string
         """
         pass
+
+    @abstractmethod
+    async def release_resources(self) -> None:
+        """
+        Release any resources held by the agent.
+        """
+        pass
+
     
     async def _publish_next_state(self, invoice_id: str, data: Dict[str, Any]) -> None:
         """

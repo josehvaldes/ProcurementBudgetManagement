@@ -4,7 +4,7 @@ import json
 import pytest
 
 from agents.validation_agent.tools.agentic_validator import AgenticValidator
-from shared.models.agentic import AgenticResponse
+from shared.models.agentic import ValidatorAgenticResponse
 from shared.models.invoice import Invoice
 from shared.models.vendor import Vendor
 
@@ -37,7 +37,7 @@ class TestAgenticValidator:
     async def test_valid_invoice(self, validator, invoice, vendor):
         # Add assertions to validate the invoice and vendor data
         print("Testing invalid invoice...")
-        response: AgenticResponse = await validator.ainvoke({
+        response: ValidatorAgenticResponse = await validator.ainvoke({
             "invoice": invoice,
             "vendor": vendor
         })

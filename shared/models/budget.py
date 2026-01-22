@@ -2,11 +2,13 @@
 Budget domain model.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
 from enum import Enum
+
+from shared.utils.convert import convert_to_table_entity
 
 
 class BudgetRotation(str, Enum):
@@ -34,12 +36,18 @@ class Budget:
     # ========== IDENTIFICATION ==========
     budget_id: str  # UUID
     fiscal_year: str  # PartitionKey - e.g., "FY2024"
-    department_id: str  # Part of RowKey
+    department_id: str  # IT, HR
     department_name: str
-    category: str  # Part of RowKey - e.g., "Software", "Hardware"
-    
+    category: str  # e.g., "Software", "Hardware"
+    project_id: str  # Associated project ID
+
+    # RowKey
+    # {department_id}:{project_id}:{category}
+    # IT:PROJ-3001:Software
+    compound_key: str  #Row Key
+
     # ========== BUDGET AMOUNTS ==========
-    allocated_amount: Decimal  # Original budget allocation (max_limit)
+    allocated_amount: Decimal = Decimal("0.00")  # Original budget allocation (max_limit)
     consumed_amount: Decimal = Decimal("0.00")  # Amount spent so far
     remaining_amount: Decimal = Decimal("0.00")  # allocated - consumed
     reserved_amount: Decimal = Decimal("0.00")  # Amount in pending invoices
@@ -72,16 +80,11 @@ class Budget:
     approver: Optional[str] = None  # Budget owner/approver
     approver_email: Optional[str] = None
     
-    # ========== ROLLOVER & CARRYOVER ==========
-    allow_rollover: bool = False  # Can unused budget carry over
-    rollover_amount: Optional[Decimal] = None  # Amount rolled from previous period
-    rollover_from: Optional[str] = None  # Previous period reference
-    
     # ========== TRACKING ==========
     invoice_count: int = 0  # Number of invoices against budget
     last_invoice_date: Optional[datetime] = None  # Most recent invoice
     last_update_by: Optional[str] = None  # Last agent/user update
-    
+
     # ========== METADATA ==========
     created_date: datetime = field(default_factory=datetime.now(timezone.utc))
     updated_date: datetime = field(default_factory=datetime.now(timezone.utc))
@@ -121,9 +124,12 @@ class Budget:
         """Get budget utilization percentage."""
         return self.consumption_rate
 
+    def to_dict(self) -> Dict[str, Any]:
+        result = asdict(self)
+        result = convert_to_table_entity(result)
+        return result
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Budget":
+        return Budget(**data)
 
-# Keep BudgetAllocation for backward compatibility
-@dataclass
-class BudgetAllocation(Budget):
-    """Alias for Budget for backward compatibility."""
-    pass

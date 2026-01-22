@@ -3,7 +3,6 @@ Validation Agent - Validates invoices against business rules and policies.
 """
 
 import asyncio
-import signal
 from typing import Dict, Any, Optional
 
 from langsmith import traceable
@@ -48,23 +47,7 @@ class ValidationAgent(BaseAgent):
             invoice_table=self.invoice_table_client
         )
 
-        self.ai_validation_tool = AgenticValidator()
-
-    def setup_signal_handlers(self):
-        """setup signal handlers."""
-        print("Setting up signal handlers...")
-        def handle_signal(sig, frame):
-            sig_name = signal.Signals(sig).name
-            self.logger.info(f"\n🛑 Received {sig_name}, initiating shutdown...")
-            self.shutdown_event.set() 
-
-        # Handle Ctrl+C (SIGINT) and kill command (SIGTERM)
-        signal.signal(signal.SIGINT, handle_signal)
-        signal.signal(signal.SIGTERM, handle_signal)
-        
-        # On Windows, also handle SIGBREAK (Ctrl+Break)
-        if hasattr(signal, 'SIGBREAK'):
-            signal.signal(signal.SIGBREAK, handle_signal)
+        self.ai_validator = AgenticValidator()
 
     async def release_resources(self) -> None:
         """Release any resources held by the agent."""
@@ -103,7 +86,7 @@ class ValidationAgent(BaseAgent):
             # Fetch vendor details if available
             vendor = deterministic_response.matched_vendor
             # Check AI validations with vendor info
-            ai_response = await self.ai_validation_tool.ainvoke({
+            ai_response = await self.ai_validator.ainvoke({
                 "invoice": invoice_obj.to_dict(),
                 "vendor": vendor.to_dict()
             })
