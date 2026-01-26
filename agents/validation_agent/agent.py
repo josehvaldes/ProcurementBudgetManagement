@@ -97,23 +97,24 @@ class ValidationAgent(BaseAgent):
             else:
                 self.logger.info(f"Invoice {invoice_id} passed AI validation")
                 invoice_obj.state = InvoiceState.VALIDATED
-            
-            invoice_obj.validation_flags = ai_response.recommended_actions
-            invoice_obj.validation_errors = ai_response.errors
+
+            invoice_obj.warnings.extend(self._build_internal_messages("AI_Validation", ai_response.warnings))
+            invoice_obj.errors.extend(self._build_internal_messages("AI_Validation", ai_response.errors))
+
             invoice_obj.validation_passed = invoice_obj.state == InvoiceState.VALIDATED
         
         elif deterministic_response.result == ValidationResult.MANUAL_REVIEW:
             self.logger.info(f"Invoice {invoice_id} requires manual review")
             invoice_obj.state = InvoiceState.MANUAL_REVIEW
-            invoice_obj.validation_flags = []
-            invoice_obj.validation_errors = deterministic_response.messages
+
+            invoice_obj.errors.extend(self._build_internal_messages("Deterministic_Validation", deterministic_response.messages))
             invoice_obj.validation_passed = False
         
         else:
             self.logger.warning(f"Invoice {invoice_id} failed deterministic validation")
             invoice_obj.state = InvoiceState.FAILED
-            invoice_obj.validation_flags = []
-            invoice_obj.validation_errors = deterministic_response.messages
+
+            invoice_obj.errors.extend(self._build_internal_messages("Deterministic_Validation", deterministic_response.messages))
             invoice_obj.validation_passed = False
 
         # Update invoice state

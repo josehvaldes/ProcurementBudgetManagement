@@ -42,6 +42,17 @@ class DocumentType(str, Enum):
     INVOICE = "invoice"
     RECEIPT = "receipt"
 
+class InvoiceInternalMessage:
+    agent: str
+    message: str
+    code: Optional[str] = None
+    timestamp: str= None
+    def __init__(self, agent: str, message: str, code: Optional[str] = None, timestamp: Optional[str] = None):
+        self.agent = agent
+        self.message = message
+        self.code = code
+        self.timestamp = timestamp if timestamp else datetime.now(timezone.utc).isoformat()
+
 @dataclass
 class Invoice:
     """Invoice domain model aligned with Azure Table Storage schema."""
@@ -101,16 +112,18 @@ class Invoice:
     category: Optional[str] = None  # Spending category
     budget_year: Optional[str] = None  # FY2024, FY2025
     budget_allocated: bool = False
-    
+
     # ========== VALIDATION & APPROVAL ==========
-    validation_flags: List[str] = field(default_factory=list)
-    validation_errors: List[str] = field(default_factory=list)
     validation_passed: bool = False
     approval_required: bool = False
     approved_by: Optional[str] = None
     approved_date: Optional[datetime] = None
     rejection_reason: Optional[str] = None
-    
+
+    # ========== Errors ==========
+    errors: List[InvoiceInternalMessage] = field(default_factory=list)
+    warnings: List[InvoiceInternalMessage] = field(default_factory=list)
+
     # ========== METADATA & TRACKING ==========
     source: InvoiceSource = InvoiceSource.UPLOAD
     source_email: Optional[str] = None
@@ -120,6 +133,7 @@ class Invoice:
     tags: List[str] = field(default_factory=list)
     notes: Optional[str] = None
     
+
     def can_transition_to(self, new_state: InvoiceState) -> bool:
         """Check if transition to new state is valid."""
         valid_transitions = {
@@ -155,3 +169,4 @@ class Invoice:
     def from_dict(cls, data: Dict[str, Any]) -> "Invoice":
         """Create Invoice instance from dictionary."""
         return Invoice(**data)
+    

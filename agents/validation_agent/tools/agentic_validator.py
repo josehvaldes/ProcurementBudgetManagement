@@ -29,7 +29,6 @@ class AgentDecisionOutcome:
     validation_passed: bool = False
     state:str = ""
     vendor_matched: bool = False
-    validation_flags: Optional[list[str]] = None
     confidence_score: Optional[float] = None
     reasoning: Optional[str] = None
     recommended_actions: Optional[list[str]] = None
@@ -105,6 +104,9 @@ class AgenticValidator:
             return False, errors, []
         
         try:
+            
+            if self.agent is None:
+                self.agent = await self._get_agent()
 
             print("Invoking agent for validation...")
             result = await self.agent.ainvoke({
@@ -135,7 +137,6 @@ class AgenticValidator:
             agentic_response = ValidatorAgenticResponse(
                 passed=response_dict["validation_passed"] and response_dict["vendor_matched"],
                 response=response,
-                errors= response_dict.get("validation_flags", []),
                 recommended_actions=response_dict.get("recommended_actions", []),
                 metadata=Metadata(
                     id="",

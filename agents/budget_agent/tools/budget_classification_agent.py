@@ -1,47 +1,30 @@
 
 import json
 import operator
-import traceback
 from typing import Annotated, Optional, TypedDict
-from langsmith import traceable
-from langchain.tools import tool
 from langchain_openai import AzureChatOpenAI
-from langchain.agents import create_agent
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-
-from agents.validation_agent.tools.prompts import ValidationAgentPrompts
-from invoice_lifecycle_api.application.interfaces.service_interfaces import JoinOperator
-from shared.models.agentic import Metadata, ValidatorAgenticResponse
-from shared.models.constants import DEPARTMENT_CATEGORIES, DEPARTMENT_IDS
-from shared.models.invoice import Invoice
-from shared.models.vendor import Vendor
-from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
-from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 
 from shared.config.settings import settings
+from agents.budget_agent.tools.prompts import BudgetAgentsPrompts
+from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
+from shared.utils.constants import DEPARTMENT_CATEGORIES, DEPARTMENT_IDS
 
-class BudgetClassificationState(TypedDict):
-    messages: Annotated[list, operator.add]
-    invoice: dict = {}
-    budget_year: str
-    categories: list[str]
-    departments: list[str]
+from shared.utils.logging_config import get_logger, setup_logging
+
+setup_logging(log_level=settings.log_level,
+                log_file=settings.log_file,
+                log_to_console=settings.log_to_console)
+
+logger = get_logger(__name__)
 
 class BudgetClassificationOutcome:
-    vendor: dict = {}
+    department: str
+    category: str
+    confidence: float
+    reasoning: str
 
-@tool
-@traceable(name="budget_classification_agent", tags=["ai", "budget"])
-async def budget_classification_tool(state: BudgetClassificationState) -> dict:
-    """
-    Classify invoice into budget categories based on invoice data.
-    """
-    pass
 
 class BudgetClassificationAgent:
-    state: BudgetClassificationState
-    outcome: BudgetClassificationOutcome
-
 
     def __init__(self):
         self.credential_manager = get_credential_manager()
@@ -54,55 +37,28 @@ class BudgetClassificationAgent:
                 azure_ad_token_provider=token_provider,
                 temperature=0.1
         )
-        self.agent = self._get_agent()
 
-    async def _get_agent(self):
-        agent = create_agent (
-                model=self.llm,
-                tools=[budget_classification_tool],
-                #system_prompt=ValidationAgentPrompts.SYSTEM_PROMPT,
-                state_schema=BudgetClassificationState,
 
-            )
-        return agent
-
-    async def ainvoke(self, input:dict) -> BudgetClassificationOutcome:
+    async def ainvoke(self, input:dict) -> dict:
         errors = []
         invoice:dict = input.get("invoice", None)
         if invoice is None:
             errors.append("Invoice information is required for validation with vendor.")
 
         if len(errors) > 0:
-            return False, errors, []
+            return {
+                "errors": errors
+            }
 
-        departments = [dept for dept in DEPARTMENT_IDS]
-        categories = [category for category in DEPARTMENT_CATEGORIES]
-
-        if self.agent is None:
-            self.agent = await self._get_agent()
-
-        print("Invoking agent for validation...")
-        result = await self.agent.ainvoke({
-            "messages": [HumanMessage(content=f"invoice: {invoice} \n\n departments: {departments} \n\n categories: {categories}")]
-        })
-
-        messages = result["messages"]
-        response = messages[-1].content
-        sum_input_tokens = 0
-        sum_output_tokens = 0
-        sum_total_tokens = 0
-
-        for msg in messages:
-            if isinstance(msg, AIMessage):
-                metadata = msg.usage_metadata
-                if metadata:
-                    sum_input_tokens += metadata.get("input_tokens") or 0
-                    sum_output_tokens += metadata.get("output_tokens") or 0
-                    sum_total_tokens += metadata.get("total_tokens") or 0
-
-        response_dict = json.loads(response)
-        print(f"Response Dict: {response_dict}")
-        return BudgetClassificationOutcome(
-            vendor=response_dict.get("vendor", {}),
-            invoice=response_dict.get("invoice", {})
+        messages = BudgetAgentsPrompts.build_budget_classification_prompt(
+            context=invoice,
+            category=invoice.get("category", "Not set"),
+            department=invoice.get("department_id", "Not set")
         )
+        logger.info("Invoking LLM for budget classification...")
+        result = await self.llm.ainvoke(messages)
+        if not result or not result.content:
+            raise ValueError("No response from LLM for budget classification.")
+        logger.info(result.content)
+        json_result = json.loads(result.content)
+        return json_result

@@ -29,7 +29,6 @@ class Budget:
     """
     Budget tracking and management.
     Aligned with Azure Table Storage schema.
-    RowKey: department_id-category (e.g., "IT-Software")
     PartitionKey: fiscal_year (e.g., "FY2024")
     """
     

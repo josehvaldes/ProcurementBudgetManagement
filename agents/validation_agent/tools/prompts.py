@@ -25,7 +25,6 @@ class ValidationAgentPrompts:
     "validation_passed": boolean,
     "state": "VALIDATED" | "FAILED" | "MANUAL_REVIEW",
     "vendor_matched": boolean,
-    "validation_flags": ["flag1", "flag2"],
     "confidence_score": 0.0-1.0,
     "reasoning": "Clear explanation of decision",
     "recommended_actions": ["action1", "action2"]

@@ -6,7 +6,7 @@ from datetime import datetime
 departments = ["IT", "HR", "FINANCE", "OPERATIONS"]
 categories = ["Software", "Hardware", "Consulting", "Travel", "Supplies"]
 projects = ["PROJ-001", "PROJ-002", "None"]
-years = ["2024", "2025"]
+years = [2024, 2025]
 months = [f"{i:02d}" for i in range(1, 13)]
 
 def generate_budget_analytics_data():
@@ -42,7 +42,7 @@ def generate_budget_analytics_data():
                         
                         entity = {
                             "PartitionKey": f"FY{year}",
-                            "RowKey": f"{dept}:{category}:{year}:{month}:{project}",
+                            "RowKey": f"{dept}:{category}:{project}:{year}:{month}",
                             "department_id": dept,
                             "project_id": project,
                             "category": category,

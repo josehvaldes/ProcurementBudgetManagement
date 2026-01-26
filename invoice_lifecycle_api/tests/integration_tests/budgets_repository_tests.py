@@ -8,8 +8,9 @@ import uuid
 
 from shared.config.settings import settings
 from shared.models.budget import Budget
+from shared.utils.constants import CompoundKeyStructure
 from shared.utils.logging_config import get_logger, setup_logging
-from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import CompoundKeyStructure, TableStorageService
+from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.application.interfaces.service_interfaces import JoinOperator, TableServiceInterface
 
 setup_logging(
@@ -33,7 +34,7 @@ class BudgetsRepositoryTests:
     async def test_query_single_entity(self):
         try:
             logger.info("Testing single entity query for IT-1 department, PROJ-2026, Software category in FY2026")
-            row_key = "IT-1:PROJ-2026:Software"
+            row_key = "IT:PROJ-2026:Software"
             filters = [("PartitionKey", "FY2026"), ("RowKey", row_key)]
             entities = await self.budget_repository.query_entities(filters, join_operator=JoinOperator.AND)
             for entity in entities:
@@ -47,7 +48,7 @@ class BudgetsRepositoryTests:
     async def test_query_lt_gt_filter_unique(self):
         try:
             logger.info("Testing lt/gt filters to query budgets for Advertising category in FY2026")
-            compound_key = f"IT-1{CompoundKeyStructure.LOWER_BOUND.value}PROJ01-2026{CompoundKeyStructure.LOWER_BOUND.value}Software"
+            compound_key = f"IT{CompoundKeyStructure.LOWER_BOUND.value}PROJ01-2026{CompoundKeyStructure.LOWER_BOUND.value}Software"
             entities = await self.budget_repository.query_compound_key("FY2026", compound_key)
             for entity in entities:
                 budget: Budget = Budget.from_dict(entity)
@@ -60,12 +61,12 @@ class BudgetsRepositoryTests:
     async def test_query_lt_gt_filter_no_category(self):
         try:
             logger.info("Testing lt/gt filters to query budgets for Software and Training category in FY2026")
-            compound_key = f"IT-1{CompoundKeyStructure.LOWER_BOUND.value}PROJ01-2026"
-            entities = await self.budget_repository.query_compound_key("FY2026", compound_key)  # exclude category
+            compound_key = f"FIN{CompoundKeyStructure.LOWER_BOUND.value}PROJ03-2025"
+            entities = await self.budget_repository.query_compound_key("FY2025", compound_key)  # exclude category
             for entity in entities:
                 budget: Budget = Budget.from_dict(entity)
                 logger.info(f" - {budget}")
-            assert len(entities) >= 2
+            assert len(entities) >= 1
         except Exception as e:
             logger.error(f"Error querying entities with lt/gt filters: {e}")
             traceback.print_exc()

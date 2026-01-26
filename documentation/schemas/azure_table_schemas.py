@@ -110,7 +110,6 @@ INVOICES_SCHEMA = {
     "budget_allocated": "bool",        # Whether budget was allocated
     
     # ========== VALIDATION & APPROVAL ==========
-    "validation_flags": "Optional[str]", # JSON array - Validation issues
     "validation_passed": "bool",       # Overall validation result
     "approval_required": "bool",       # Whether manual approval needed
     "approved_by": "Optional[str]",    # User who approved (if manual)

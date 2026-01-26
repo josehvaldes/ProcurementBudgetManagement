@@ -17,5 +17,4 @@ class ValidatorAgenticResponse(BaseModel):
     response: str
     metadata: Metadata
     passed: bool
-    errors: list[str] = []
     recommended_actions: list[str] = []

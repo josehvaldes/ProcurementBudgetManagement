@@ -2,6 +2,7 @@
 Base agent class for invoice processing agents.
 """
 import asyncio
+from datetime import datetime, timezone
 import signal
 from langsmith import traceable
 from langsmith.run_helpers import get_current_run_tree
@@ -15,7 +16,7 @@ from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service
 from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
-from shared.models.invoice import InvoiceState
+from shared.models.invoice import InvoiceInternalMessage, InvoiceState
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.config.settings import settings
 
@@ -287,3 +288,16 @@ class BaseAgent(ABC):
         )
         return key == invoice["invoice_id"]
 
+    def _build_internal_messages(self, code:str, messages: list[str]) -> list[InvoiceInternalMessage]:
+        """
+        Build internal messages log for invoice.
+        Args:
+            messages: List of message dicts with 'agent', 'message', 'code', 'timestamp'
+        """
+        internal_list =  [InvoiceInternalMessage(
+            agent=self.agent_name,
+            message=msg,
+            code=code
+        ) for msg in messages]
+        
+        return internal_list

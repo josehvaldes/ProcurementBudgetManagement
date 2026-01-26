@@ -2,6 +2,7 @@ import traceback
 from enum import Enum
 from azure.data.tables.aio import TableClient
 
+from shared.utils.constants import CompoundKeyStructure
 from shared.utils.logging_config import get_logger
 
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
@@ -11,11 +12,6 @@ from invoice_lifecycle_api.application.interfaces.service_interfaces import Comp
 logger = get_logger(__name__)
 
 AZURE_TABLE_METADATA_FIELDS = {'PartitionKey', 'RowKey', 'Timestamp', 'etag', 'odata.etag', 'odata.metadata'}
-
-class CompoundKeyStructure(str, Enum):
-    LOWER_BOUND = ":"
-    UPPER_BOUND = ";"
-    
 
 class TableStorageService(TableServiceInterface):
 
@@ -61,18 +57,18 @@ class TableStorageService(TableServiceInterface):
             filter_query = "PartitionKey eq @partition_key and RowKey ge @lower and RowKey lt @upper"
             parameters = {
                 "partition_key": partition_key,
-                "lower": row_key,
-                "upper": row_key + CompoundKeyStructure.UPPER_BOUND.value  # Upper bound is exclusive
+                "lower": f"{row_key}{CompoundKeyStructure.LOWER_BOUND.value}",  # Lower bound is inclusive
+                "upper": f"{row_key}{CompoundKeyStructure.UPPER_BOUND.value}"  # Upper bound is exclusive
             }
 
-            logger.info(f"Querying entity with PartitionKey: {partition_key}, RowKey: {row_key}")
+            logger.info(f"Querying entity with PartitionKey: {partition_key}, RowKey: {parameters}")
+            logger.info(f"Querying parameters: {parameters}")
 
             entities = self.table_client.query_entities(query_filter=filter_query,
                                                         parameters=parameters)
 
             results = []
             async for entity in entities:
-                logger.info(f"Entity queried successfully. Row Key: {row_key}")
                 results.append(self._strip_metadata(dict(entity)))
 
             if not results:

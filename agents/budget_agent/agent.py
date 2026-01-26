@@ -3,14 +3,16 @@ Budget Agent - Tracks and validates budget allocations.
 """
 
 import asyncio
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from langsmith import traceable
 
+from agents.budget_agent.tools.budget_classification_agent import BudgetClassificationAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.config.settings import settings
 from agents.base_agent import BaseAgent
-from shared.models.invoice import InvoiceState
-from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from shared.models.invoice import InvoiceInternalMessage, InvoiceState
+from shared.utils.constants import CompoundKeyStructure, InvoiceSubjects, SubscriptionNames
 
 class BudgetAgent(BaseAgent):
     """
@@ -37,6 +39,8 @@ class BudgetAgent(BaseAgent):
             table_name=settings.budgets_table_name
         )
 
+        self.budget_classification_agent = BudgetClassificationAgent()
+
     @traceable(name="budget_agent.process_invoice", tags=["budget", "agent"], metadata={"version": "1.0"})
     async def process_invoice(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -53,48 +57,77 @@ class BudgetAgent(BaseAgent):
         department_id = message_data["department_id"]
         category = message_data["category"]
         project_id = message_data.get("project_id", "GEN-0")
-
-        compound_key = f"{department_id}:{project_id}:{category}"
         budget_year = message_data.get("budget_year", "FY2024")
 
         self.logger.info(f"Extracting data from invoice: [{invoice_id}], department_id {department_id}, project_id {project_id}, category {category}")
+
         # Get invoice from storage
         invoice = await self.get_invoice(department_id, invoice_id)
 
         if not invoice:
             raise ValueError(f"Invoice {invoice_id} not found")
 
+        classification = await self.budget_classification_agent.ainvoke({
+            "invoice": invoice
+        })
+        if not classification:
+            invoice.get("errors", []).append(InvoiceInternalMessage(
+                agent="Budget Classification Agent",
+                message="Failed to classify invoice for budget allocation.",
+                code="BUDGET_CLASSIFICATION_FAILED"
+            ))
+            self.logger.warning("Classification not found from budget classification agent.")
+            raise ValueError("Classification not found from budget classification agent.")
+        
+        self.logger.info(f"Budget classification result: {classification}")
+
+        if classification.get("category", None) != category:
+            invoice.update({
+                "category": classification.get("category", None),
+            })
+            invoice.get("warnings", []).append(InvoiceInternalMessage(
+                agent="Budget Classification Agent",
+                message=f"Invoice category '{category}' updated to '{classification.get('category', None)}' based on budget classification.",
+                code="BUDGET_CATEGORY_UPDATED"
+            ))
+            self.logger.info("Budget classification does not match existing data.")
+
+        lower_bound = CompoundKeyStructure.LOWER_BOUND.value
+        compound_key = f"{classification.get('department', None)}{lower_bound}{project_id}{lower_bound}{classification.get('category', None)}"
+
         budget_filters = [
             ("PartitionKey", budget_year),
             ("RowKey", f"{compound_key}"),
         ]
-        budget = await self.budget_table_client.query_entities(
+        budgets = await self.budget_table_client.query_entities(
             filters_query=budget_filters
         )
-        
-        # TODO: Implement budget checking logic
-        # - Get budget allocation for department/project
+        budget = budgets[0] if budgets and len(budgets) > 0 else None
+
+        if not budget or len(budget) == 0:
+            invoice.get("errors", []).append(InvoiceInternalMessage(
+                agent="Budget Agent",
+                message=f"No budget allocation found for {classification.get('department', None)}, project {project_id}, category {classification.get('category', None)} for {budget_year}.",
+                code="BUDGET_ALLOCATION_NOT_FOUND"
+            ))
+            self.logger.error(f"No budget allocation found for {classification.get('department', None)}, project {project_id}, category {classification.get('category', None)} for {budget_year}")
+            raise ValueError(f"No budget allocation found for {classification.get('department', None)}, project {project_id}, category {classification.get('category', None)} for {budget_year}")
+
         # - Calculate available budget
         # - Check if invoice amount fits within budget
         # - Update budget spent/committed amounts
         
-        budget_available = True
-        budget_warnings = []
-        
-        # Update invoice state
+        invoice_amount = float(invoice.get("amount", 0))        # Update invoice state
         invoice["state"] = "BUDGET_CHECKED"
-        invoice["budget_available"] = budget_available
-        invoice["budget_warnings"] = budget_warnings
+        # allocate budget fields
         
-        self.update_invoice(invoice)
+        await self.update_invoice(invoice)
         
         return {
             "invoice_id": invoice_id,
             "department_id": department_id,
-            "event_type": "BudgetAgentGenerated",
             "state": InvoiceState.BUDGET_CHECKED.value,
-            "budget_available": budget_available,
-            "budget_warnings": budget_warnings,
+            "event_type": "BudgetAgentGenerated",
         }
     
     def get_next_subject(self) -> str:
