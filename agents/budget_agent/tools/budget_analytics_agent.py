@@ -10,6 +10,8 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from agents.budget_agent.tools.prompts import BudgetAgentsPrompts
+from documentation.schemas.azure_table_schemas import InvoiceState
+from invoice_lifecycle_api.application.interfaces.service_interfaces import CompareOperator
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 
@@ -19,19 +21,48 @@ from shared.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-class BudgetAnalyticsState(TypedDict):
-    messages: Annotated[list, operator.add]
-    invoice: dict = {}
-    category: str = ""
-    department_id: str = ""
-    budget_year: str = ""
+class BudgetAnalyticsOutcome(TypedDict):
+    explanation: str
+    confidence_score: float
 
+    def __init__(self, explanation: str, confidence_score: float):
+        self.explanation = explanation
+        self.confidence_score = confidence_score
 
-class BudgetAnalyticsOutcome:
-    analytics: dict = {}
+async def get_invoices_by_vendor(vendor_name: str, months: int = 12) -> list:
+    """
+    Fetch invoices by vendor from Table Storage.
+    Inputs:
+        vendor_name: Vendor Name
+        months: Number of months of historical data to retrieve
+    Returns a list of invoices.
+    """
+    invoice_table: TableStorageService
+    async with TableStorageService(
+        storage_account_url=settings.table_storage_account_url,
+        table_name=settings.invoices_table_name
+    ) as invoice_table:
+        
+        invoices = []
+        logger.info(f"Fetching invoices for Vendor Name: {vendor_name}, Months: {months}")
+        filters = [("vendor_name", vendor_name, CompareOperator.EQUAL.value), 
+                   ("state", InvoiceState.FAILED, CompareOperator.NOT_EQUAL.value)]
+        data = await invoice_table.query_entities_with_filters(
+            filters=filters
+        )
+        # get data from awaited data
+        if data:
+            #order by invoice date descending
+            data = sorted(data, key=lambda x: x.get("invoice_date", ""), reverse=True)
+            #limit to months
+            invoices.extend(data[:months])
+            logger.info(f"Fetched {len(data)} invoices for Vendor Name: {vendor_name}")
+        else:
+            logger.warning(f"No invoices found for Vendor Name: {vendor_name}")
 
-@tool
-async def get_historical_spending_data(department_id: str, category: str, project_id:str, budget_year:int, months: int = 12):
+        return invoices
+
+async def get_historical_spending_data(department_id: str, category: str, project_id:str, budget_year:int, months: int = 12) -> list:
     """
     Fetch historical spending data from Table Storage based on department, category, project, and budget year.
     Inputs:
@@ -84,16 +115,7 @@ async def get_historical_spending_data(department_id: str, category: str, projec
         return historical_spending
 
 
-async def calculate_budget_utilization_tool(department_id:str, category:str, budget_year:str) -> dict:
-    """
-    Calculate budget utilization based on invoice information.
-    """
-    pass
-
 class BudgetAnalyticsAgent:
-    state: BudgetAnalyticsState
-    outcome: BudgetAnalyticsOutcome
-
 
     def __init__(self):
         self.credential_manager = get_credential_manager()
@@ -106,17 +128,65 @@ class BudgetAnalyticsAgent:
                 azure_ad_token_provider=token_provider,
                 temperature=0.1
         )
-        self.agent = self._get_agent()
-        
-    async def _get_agent(self):
-        agent = create_agent (
-                model=self.llm,
-                tools=[get_historiacal_spending_data],
-                system_prompt=BudgetAgentsPrompts.BUDGET_RISK_ASSESSMENT_SYSTEM_PROMPT,
-                state_schema=BudgetAnalyticsState,
-        
+
+    async def impact_analysis(self, invoice: dict, budget: dict) -> dict:
+        messages = BudgetAgentsPrompts.budget_impact_analytics_prompt(
+            invoice=invoice, 
+            budget=budget
         )
-        return agent
+
+        impact_result: AIMessage = await self.llm.ainvoke(
+            messages=messages
+        )
+
+        if not impact_result or not impact_result.content:
+            raise ValueError("No response from LLM for budget analytics.")
+
+        return json.loads(impact_result.content)
+
+
+    async def trend_analysis(self, invoice: dict, budget: dict, historical_spending: list[dict], vendor_invoices: list[dict]) -> dict:
+        messages = BudgetAgentsPrompts.budget_trend_analytics_prompt(
+            invoice=invoice,
+            budget=budget,
+            historical_spending=historical_spending,
+            vendor_invoices=vendor_invoices
+        )
+        trend_result: AIMessage = await self.llm.ainvoke(
+            messages=messages
+        )
+        if not trend_result or not trend_result.content:
+            raise ValueError("No response from LLM for budget trend analytics.")
+        
+        return json.loads(trend_result.content)
+
+    async def anomaly_detection(self, invoice: dict, budget: dict, historical_spending: list[dict], vendor_invoices: list[dict]) -> dict:
+        messages = BudgetAgentsPrompts.anomaly_detection_prompt(
+            invoice=invoice,
+            budget=budget,
+            historical_spending=historical_spending,
+            vendor_invoices=vendor_invoices
+        )
+        anomaly_result: AIMessage = await self.llm.ainvoke(
+            messages=messages
+        )
+        if not anomaly_result or not anomaly_result.content:
+            raise ValueError("No response from LLM for budget anomaly detection.")
+        
+        return json.loads(anomaly_result.content)
+
+    async def contextual_analysis(self, context: dict) -> dict:
+        context_messages = BudgetAgentsPrompts.contextual_budget_analytics_prompt(
+            context=context
+        )
+        context_result: AIMessage = await self.llm.ainvoke(
+            messages=context_messages
+        )
+
+        if not context_result or not context_result.content:
+            raise ValueError("No response from LLM for contextual budget analytics.")
+
+        return json.loads(context_result.content)
 
     async def ainvoke(self, input:dict) -> BudgetAnalyticsOutcome:
         errors = []
@@ -124,31 +194,65 @@ class BudgetAnalyticsAgent:
         if invoice is None:
             errors.append("Invoice information is required for budget analytics.")
         
+        budget:dict = input.get("budget", None)
+        if budget is None:
+            errors.append("Budget information is required for budget analytics.")
+
         if len(errors) > 0:
             return False, errors, []
 
-        department_id = invoice.get("department_id", "Not set")
-        category = invoice.get("category", "Not set")
-        budget_year = input.get("budget_year", "FY2024")
+        department_id = invoice.get("department_id", "")
+        category = invoice.get("category", "")
+        project_id = invoice.get("project_id", "")
+        budget_year = budget.get("year", "")
+        vendor_name=invoice.get("vendor_name", "")
+        
+        historical_spending = get_historical_spending_data(
+            department_id=department_id,
+            category=category,
+            project_id=project_id,
+            budget_year=budget_year,
+            months=12 # last 12 months
+        )
 
-        result = await self.agent.ainvoke({
-            "messages": [HumanMessage(content=f"invoice: {invoice} \n\n department_id: {department_id} \n\n category: {category} \n\n budget_year: {budget_year}")]
-        })
+        vendor_invoices = get_invoices_by_vendor(
+            vendor_name=vendor_name,
+            months=12 # last 12 months
+        )
 
-        response = "__No AI Message__"
-        messages = result["messages"]
-        response = messages[-1].content
+        impact_result_content = await self.impact_analysis(
+            invoice=invoice,
+            budget=budget
+        )
 
-        sum_input_tokens = 0
-        sum_output_tokens = 0
-        sum_total_tokens = 0
+        trend_result_content = await self.trend_analysis(
+            invoice=invoice,
+            budget=budget,
+            historical_spending=historical_spending,
+            vendor_invoices=vendor_invoices
+        )
 
-        for msg in messages:
-            if isinstance(msg, AIMessage):
-                metadata = msg.usage_metadata
-                if metadata:
-                    sum_input_tokens += metadata.get("input_tokens") or 0
-                    sum_output_tokens += metadata.get("output_tokens") or 0
-                    sum_total_tokens += metadata.get("total_tokens") or 0
+        anomaly_result_content = await self.anomaly_detection(
+            invoice=invoice,
+            budget=budget,
+            historical_spending=historical_spending,
+            vendor_invoices=vendor_invoices
+        )
 
-        return BudgetAnalyticsOutcome()
+        context = {
+            "invoice": invoice,
+            "budget_impact": impact_result_content,
+            "trend_analysis": trend_result_content,
+            "anomaly_detection": anomaly_result_content
+        }
+
+        logger.info(f"Context for final analytics: {context}")
+        context_result_content = await self.contextual_analysis(
+            context=context
+        )
+
+        logger.info(context_result_content)
+        return BudgetAnalyticsOutcome(
+            explanation=context_result_content.get("explanation", ""),
+            confidence_score=context_result_content.get("confidence", 0.0)
+        )

@@ -310,12 +310,12 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
 - ✅ Set up Budget Agent Service Bus subscription
   - Create receiver for budget-agent-subscription
   - Implement message pulling loop
-- Build Budget Tracking Agent with LangChain
-  - Create tools for budget lookup
-  - Implement budget allocation logic
-  - Build consumption tracking
-  - Add forecasting logic (linear regression)
-  - Implement over-budget detection
+- ✅ Build and test budget classification agent
+- ✅ Build and test a budget analytics agent.
+  - create a prompt for impact risk analysis
+  - create a prompt for trend analysis
+  - create a prompt for anomaly detection
+  - create unit tests for new prompts and context summarize
   - Publish message with subject='invoice.budget_checked'
 - Create API endpoints for budget management (CRUD)
   - GET /budgets/{department}/{category}

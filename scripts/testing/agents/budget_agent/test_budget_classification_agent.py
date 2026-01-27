@@ -20,6 +20,7 @@ class TestBudgetClassificationAgent:
         agent = BudgetClassificationAgent()
         return agent
 
+
     @pytest.mark.asyncio
     async def test_budget_classification(self, tool):
         agent: BudgetClassificationAgent = tool
@@ -47,12 +48,12 @@ class TestBudgetClassificationAgent:
         input_data = {
             "invoice": {
                 "invoice_id": "INV-2024-003",
-                "department_id": "FINANCE",
+                "department_id": "FIN",
                 "vendor_name": "Unknown Vendor",
                 "amount": "5000.00",
                 "state": "FAILED",
                 "rejection_reason": "Vendor validation failed"
-                }
+            }
         }
         logger.info("Testing failed budget classification agent...")
         result = await agent.ainvoke(input_data)

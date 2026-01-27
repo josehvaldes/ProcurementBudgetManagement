@@ -82,6 +82,40 @@ class TableStorageService(TableServiceInterface):
             traceback.print_exc()
             return []
 
+    async def query_entities_with_filters(self, filters: list[tuple[str, str, str | None]], 
+                             join_operator: JoinOperator = JoinOperator.AND) -> list[dict]:
+        """Query entities from Azure Table Storage using a filter string."""
+        results = []
+        try:
+            parameters = {}
+
+            index = 1
+            for field, value, comparer in filters:
+                if parameters.get(f"{field.lower()}") is None:
+                    parameters[f"{field.lower()}"] = value
+                else:
+                    parameters[f"{field.lower()}{index}"] = value
+                    index += 1
+            
+            name_filter = f"{join_operator.value}".join(
+                [f"{filter_name} {comparer} @{param_name}"
+                 for (filter_name, value, comparer), param_name in zip(filters, parameters)
+                ]
+            )
+
+            logger.info(f"Querying entities with filter:[{name_filter}]. Parameters: {parameters}")
+
+            entities = self.table_client.query_entities(query_filter=name_filter,
+                                                        parameters=parameters)
+
+            async for entity in entities:
+                results.append(self._strip_metadata(dict(entity)))
+            logger.info(f"Queried {len(results)} entities successfully. filter:[{name_filter}]. Parameters: {parameters}")
+        except Exception as e:
+            logger.error(f"Error querying entities from Table Storage: {e}")
+            traceback.print_exc()
+        return results
+
     async def query_entities(self, filters_query: list[tuple[str, str]], 
                              join_operator: JoinOperator = JoinOperator.AND, 
                              compare_operator: CompareOperator = CompareOperator.EQUAL) -> list[dict]:

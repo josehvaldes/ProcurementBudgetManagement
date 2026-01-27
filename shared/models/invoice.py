@@ -112,6 +112,7 @@ class Invoice:
     category: Optional[str] = None  # Spending category
     budget_year: Optional[str] = None  # FY2024, FY2025
     budget_allocated: bool = False
+    budget_analysis: Optional[str] = None  # Explanation of budget impact
 
     # ========== VALIDATION & APPROVAL ==========
     validation_passed: bool = False

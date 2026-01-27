@@ -4,9 +4,11 @@ Budget Agent - Tracks and validates budget allocations.
 
 import asyncio
 from datetime import datetime, timezone
+import json
 from typing import Dict, Any, Optional
 from langsmith import traceable
 
+from agents.budget_agent.tools.budget_analytics_agent import BudgetAnalyticsAgent, BudgetAnalyticsOutcome
 from agents.budget_agent.tools.budget_classification_agent import BudgetClassificationAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.config.settings import settings
@@ -40,6 +42,7 @@ class BudgetAgent(BaseAgent):
         )
 
         self.budget_classification_agent = BudgetClassificationAgent()
+        self.budget_analytics_agent = BudgetAnalyticsAgent()
 
     @traceable(name="budget_agent.process_invoice", tags=["budget", "agent"], metadata={"version": "1.0"})
     async def process_invoice(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -113,15 +116,22 @@ class BudgetAgent(BaseAgent):
             self.logger.error(f"No budget allocation found for {classification.get('department', None)}, project {project_id}, category {classification.get('category', None)} for {budget_year}")
             raise ValueError(f"No budget allocation found for {classification.get('department', None)}, project {project_id}, category {classification.get('category', None)} for {budget_year}")
 
-        # - Calculate available budget
-        # - Check if invoice amount fits within budget
-        # - Update budget spent/committed amounts
-        
-        invoice_amount = float(invoice.get("amount", 0))        # Update invoice state
+        response: BudgetAnalyticsOutcome = await self.budget_analytics_agent.ainvoke({
+            "invoice": invoice,
+            "budget": budget
+        })
+
+        self.logger.info(f"Budget analytics result: {response}")
         invoice["state"] = "BUDGET_CHECKED"
-        # allocate budget fields
-        
+        invoice["budget_analysis"] = json.dumps({
+            "explanation": response.explanation,
+            "confidence_score": response.confidence_score
+        })
+       
         await self.update_invoice(invoice)
+        
+        # TODO
+        # improve error handling and reporting from budget analytics agent
         
         return {
             "invoice_id": invoice_id,

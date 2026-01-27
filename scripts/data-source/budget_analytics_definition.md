@@ -1,5 +1,5 @@
 ##
-departments = ["IT", "HR", "FINANCE", "OPERATIONS"]
+departments = ["IT", "HR", "FIN", "OPS"]
 categories = ["Software", "Hardware", "Consulting", "Travel", "Supplies"]
 projects = ["PROJ-001", "PROJ-002", "None"]  # None = no project
     

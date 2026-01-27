@@ -42,6 +42,12 @@ class TableServiceInterface(ABC):
         pass
 
     @abstractmethod
+    async def query_entities_with_filters(self, filters: list[tuple[str, str, str | None]], 
+                        join_operator: JoinOperator = JoinOperator.AND) -> list[dict]:
+        """Query entities from the table storage using a filter string."""
+        pass
+
+    @abstractmethod
     async def delete_entity(self, partition_key: str, row_key: str) -> None:
         """Delete entity by ID."""
         pass

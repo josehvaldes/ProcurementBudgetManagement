@@ -3,7 +3,7 @@ import random
 from datetime import datetime
 
 # Define constants
-departments = ["IT", "HR", "FINANCE", "OPERATIONS"]
+departments = ["IT", "HR", "FIN", "OPS", "MKT"]
 categories = ["Software", "Hardware", "Consulting", "Travel", "Supplies"]
 projects = ["PROJ-001", "PROJ-002", "None"]
 years = [2024, 2025]
@@ -20,6 +20,10 @@ def generate_budget_analytics_data():
                 for category in categories:
                     for project in projects:
                         # Generate realistic financial data
+
+                        # ramdomly skip some combinations to add variability
+                        if random.random() < 0.3:
+                            continue
 
                         # Add seasonality (Q4 spending spike)
                         seasonal_factor = 1.3 if month in [10, 11, 12] else 1.0

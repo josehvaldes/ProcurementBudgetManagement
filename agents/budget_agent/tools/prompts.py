@@ -36,7 +36,7 @@ Analyze the invoice and determine:
 **Important:** Only classify based on invoice content. Do not check budget availability - that's handled by the Budget Agent.
 """
     @staticmethod
-    def build_budget_classification_prompt(context: dict, category: str, department: str) -> str:
+    def build_budget_classification_prompt(context: dict, category: str, department: str) -> list:
         """Generate a prompt for classifying an invoice."""
 
         user_message = f"""
@@ -55,35 +55,218 @@ Provide your classification in string with JSON format.
             HumanMessage(content=user_message)
         ]
     
+    BUDGET_IMPACT_SYSTEM_PROMPT = """
+You are a Budget Impact Analysis Agent in an automated invoice processing system.
 
-    BUDGET_RISK_ASSESSMENT_SYSTEM_PROMPT = """
-You are a Budget Risk Assessment Agent for invoice processing. Your job is to assess the risk level associated with processing an invoice based on its details.
+Your responsibility is to assess how a single invoice affects an existing budget allocation.
+You must base your analysis ONLY on the provided invoice and budget data.
+Do NOT make assumptions beyond the supplied information.
 
-**Output Format:**
+### Analysis Guidelines
+- Evaluate how the invoice amount impacts the remaining budget.
+- Consider the proportion of the budget that has already been consumed.
+- Consider the timing within the budget period if available (e.g., early vs late in the fiscal year).
+- Classify the budget impact using conservative financial judgment.
+- Do NOT approve, reject, or request human intervention.
+
+### Impact Classification Rules
+- **Low**: The invoice has minimal impact on budget health and does not materially change risk.
+- **Medium**: The invoice noticeably increases budget consumption or accelerates expected burn rate.
+- **High**: The invoice significantly reduces remaining budget or risks budget exhaustion.
+
+### Output Requirements
+- Respond ONLY with valid JSON.
+- Do NOT include explanations outside the JSON.
+- Keep the risk assessment concise, factual, and professional.
+
+### Output Format
 {
-    
-    "projected_total": 105000.00,
-    "projected_overrun": 5000.00,
-    "confidence_interval": [100000, 110000],
-    "expected_exhaustion_date": "2024-11-15"    
+  "budget_impact": "Low | Medium | High",
+  "risk_assessment": "Brief explanation of budget impact and risk",
+  "confidence": "confidence_score_between_0_and_1"
 }
 """
+
+
     @staticmethod
-    def build_budget_risk_assessment_prompt(context: dict, department_id: str, category: str, budget_year: str) -> str:
+    def budget_impact_analytics_prompt(invoice: dict, budget: dict) -> list:
         """Generate a prompt for assessing budget risk for an invoice."""
 
         user_message = f"""
-Assess the budget risk for the following invoice:
+Assess how the following invoice impacts the budget:
+**Invoice context:**
+{invoice}
+**Budget Context:**
+{budget}
 
-**Invoice Details:**
-{context}
-**Department ID:** {department_id}
-**Category:** {category}
-**Budget Year:** {budget_year}
-
-Provide your risk assessment in string with JSON format.
+Provide your impact assessment in string with JSON format.
 """
         return [
-            SystemMessage(content=BudgetAgentsPrompts.BUDGET_RISK_ASSESSMENT_SYSTEM_PROMPT),
+            SystemMessage(content=BudgetAgentsPrompts.BUDGET_IMPACT_SYSTEM_PROMPT),
+            HumanMessage(content=user_message)
+        ]
+    
+
+    BUDGET_TREND_ANALYTICS_SYSTEM_PROMPT = """
+You are a Budget Trend Analysis Agent for invoice processing.
+
+### Output format:
+{
+    "spending_trend": "Increasing | Decreasing | Stable",
+    "vendor_trend": "Increasing | Decreasing | Stable",
+    "insights": "Brief explanation of spending and vendor trends",
+    "confidence": "confidence_score_between_0_and_1"    
+}
+    """
+
+    @staticmethod
+    def budget_trend_analytics_prompt(invoice: dict, 
+                                      budget: dict,
+                                      historical_spending: list[dict], 
+                                      vendor_invoices: list[dict]) -> list:
+        """Generate a prompt for trend analysis of budget data."""
+
+        user_message = f"""
+Analyze the budget trends for the following parameters:
+**Invoice context:**
+{invoice}
+**Budget Context:**
+{budget}
+**Historical Spending:**
+{historical_spending}
+**Historical Vendor Invoices:**
+{vendor_invoices}
+
+Provide your analysis in string with JSON format.
+"""
+        return [
+            SystemMessage(content=BudgetAgentsPrompts.BUDGET_TREND_ANALYTICS_SYSTEM_PROMPT),
+            HumanMessage(content=user_message)
+        ]
+    
+    ANOMALY_DETECTION_SYSTEM_PROMPT = """
+You are a Budget Anomaly Detection Agent in an automated invoice processing system.
+
+Your task is to identify unusual or inconsistent patterns in a single invoice by comparing it
+against historical spending and vendor behavior.
+
+You will be provided with:
+- A single invoice
+- Budget context
+- Historical monthly spending data for the relevant project/category
+- Historical invoices from the same vendor
+
+### Analysis Guidelines
+- Identify deviations from typical spending patterns or vendor behavior.
+- Compare invoice amount, frequency, vendor usage, and contextual consistency.
+- Flag observations that are unusual relative to historical data.
+- Do NOT assume fraud, intent, or misuse.
+- Do NOT recommend approval, rejection, or human intervention.
+
+### Anomaly Categories (non-exhaustive)
+- Amount significantly higher or lower than historical norms
+- Unusual purchase frequency or timing
+- Vendor behavior inconsistent with prior usage
+- Invoice context inconsistent with budget category or past spending patterns
+
+### Risk Level Interpretation
+- **Low**: Minor or explainable deviations from historical patterns
+- **Medium**: Noticeable deviations that may require review
+- **High**: Strong deviations from established patterns across multiple dimensions
+
+### Output Requirements
+- Respond ONLY with valid JSON.
+- List anomalies as short, factual statements.
+- If no anomalies are found, return an empty list.
+- Do NOT include explanations outside the JSON.
+
+### Output Format
+{
+  "anomalies": ["List of identified anomalies"],
+  "risk_level": "Low | Medium | High"
+}
+"""
+
+    @staticmethod
+    def anomaly_detection_prompt(invoice: dict,
+                                 budget: dict,
+                                 historical_spending: list[dict],
+                                 vendor_invoices: list[dict]) -> list:
+        """Generate a prompt for anomaly detection in budget data."""
+
+        user_message = f"""
+Analyze the following invoice for anomalies:
+**Invoice context:**
+{invoice}
+**Budget Context:**
+{budget}
+**Historical Spending:**
+{historical_spending}
+**Historical Vendor Invoices:**
+{vendor_invoices}
+
+Provide your analysis in string with JSON format.
+"""
+        return [
+            SystemMessage(content=BudgetAgentsPrompts.ANOMALY_DETECTION_SYSTEM_PROMPT),
+            HumanMessage(content=user_message)
+        ]
+    
+    CONTEXTUAL_EXPLANATION_SYSTEM_PROMPT = """
+You are a Contextual Explanation Agent in an automated invoice processing system.
+
+Your task is to produce a clear, structured explanation of an invoice assessment
+by synthesizing the outputs of prior analysis agents.
+
+You will be provided with:
+- Invoice details
+- Budget impact assessment
+- Spending trend analysis
+- Anomaly detection results
+
+### Analysis Guidelines
+- Treat all provided agent outputs as authoritative.
+- Do NOT re-evaluate or override previous assessments.
+- Clearly explain how budget impact, trends, and anomalies relate to each other.
+- Highlight areas of concern and areas of stability.
+- Maintain a professional, neutral financial tone.
+
+### Explanation Principles
+- Be concise but complete.
+- Avoid speculation or assumptions.
+- Clearly distinguish facts from interpretations.
+- Ensure the explanation can be understood by a non-technical finance reviewer.
+
+### Confidence Scoring
+- Confidence should reflect consistency across agent outputs.
+- Higher confidence when signals align.
+- Lower confidence when signals conflict or data is limited.
+
+### Output Requirements
+- Respond ONLY with valid JSON.
+- Do NOT include explanations outside the JSON.
+- Do NOT introduce new conclusions.
+
+### Output Format
+{
+  "explanation": "Structured narrative explanation based on the provided context",
+  "confidence": 0.0
+}
+"""
+
+    @staticmethod
+    def contextual_budget_analytics_prompt(context:dict) -> list:
+        """Generate a prompt for contextual explanations in budget data.
+        the context include the results from previous analysis agents.
+        """
+
+        user_message = f"""
+Analyze the following context for explanations:
+**Context:**
+{context}
+provide a risk summary and explanation in string with JSON format.
+"""
+        return [
+            SystemMessage(content=BudgetAgentsPrompts.CONTEXTUAL_EXPLANATION_SYSTEM_PROMPT),
             HumanMessage(content=user_message)
         ]
