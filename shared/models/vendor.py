@@ -136,9 +136,18 @@ class Vendor:
     
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Vendor':
+    def from_dict(cls, data: dict) -> 'Vendor':
         """Populate Vendor fields from a dictionary."""
-        vendor = Vendor(**data)
+
+        converted_data = {}
+        for key, value in data.items():
+            # Convert TablesEntityDatetime to Python datetime
+            if hasattr(value, '__class__') and 'TablesEntityDatetime' in value.__class__.__name__:
+                converted_data[key] = datetime.fromisoformat(value.isoformat())
+            else:
+                converted_data[key] = value
+
+        vendor = Vendor(**converted_data)
 
         bank_account_data = data.get('bank_account', None)
         if bank_account_data:

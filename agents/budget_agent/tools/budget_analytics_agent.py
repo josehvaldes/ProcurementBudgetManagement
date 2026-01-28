@@ -46,7 +46,7 @@ async def get_invoices_by_vendor(vendor_name: str, months: int = 12) -> list:
         invoices = []
         logger.info(f"Fetching invoices for Vendor Name: {vendor_name}, Months: {months}")
         filters = [("vendor_name", vendor_name, CompareOperator.EQUAL.value), 
-                   ("state", InvoiceState.FAILED, CompareOperator.NOT_EQUAL.value)]
+                   ("state", InvoiceState.FAILED.value, CompareOperator.NOT_EQUAL.value)]
         data = await invoice_table.query_entities_with_filters(
             filters=filters
         )
@@ -135,10 +135,10 @@ class BudgetAnalyticsAgent:
             budget=budget
         )
 
-        impact_result: AIMessage = await self.llm.ainvoke(
-            messages=messages
-        )
+        logger.info(f"Invoke Impact Analysis")
+        impact_result: AIMessage = await self.llm.ainvoke(messages)
 
+        logger.info(f"Impact Analysis Result: {impact_result.content}")
         if not impact_result or not impact_result.content:
             raise ValueError("No response from LLM for budget analytics.")
 
@@ -152,9 +152,8 @@ class BudgetAnalyticsAgent:
             historical_spending=historical_spending,
             vendor_invoices=vendor_invoices
         )
-        trend_result: AIMessage = await self.llm.ainvoke(
-            messages=messages
-        )
+        trend_result: AIMessage = await self.llm.ainvoke(messages)
+
         if not trend_result or not trend_result.content:
             raise ValueError("No response from LLM for budget trend analytics.")
         
@@ -167,9 +166,8 @@ class BudgetAnalyticsAgent:
             historical_spending=historical_spending,
             vendor_invoices=vendor_invoices
         )
-        anomaly_result: AIMessage = await self.llm.ainvoke(
-            messages=messages
-        )
+        anomaly_result: AIMessage = await self.llm.ainvoke(messages)
+
         if not anomaly_result or not anomaly_result.content:
             raise ValueError("No response from LLM for budget anomaly detection.")
         
@@ -179,9 +177,7 @@ class BudgetAnalyticsAgent:
         context_messages = BudgetAgentsPrompts.contextual_budget_analytics_prompt(
             context=context
         )
-        context_result: AIMessage = await self.llm.ainvoke(
-            messages=context_messages
-        )
+        context_result: AIMessage = await self.llm.ainvoke(context_messages)
 
         if not context_result or not context_result.content:
             raise ValueError("No response from LLM for contextual budget analytics.")

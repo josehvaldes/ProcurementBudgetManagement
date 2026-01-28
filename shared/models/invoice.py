@@ -167,7 +167,15 @@ class Invoice:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Invoice":
-        """Create Invoice instance from dictionary."""
-        return Invoice(**data)
-    
+    def from_dict(cls, data: dict) -> 'Invoice':
+        """Create Invoice from dictionary, converting TablesEntityDatetime to datetime"""
+        converted_data = {}
+        for key, value in data.items():
+            # Convert TablesEntityDatetime to Python datetime
+            if hasattr(value, '__class__') and 'TablesEntityDatetime' in value.__class__.__name__:
+                converted_data[key] = datetime.fromisoformat(value.isoformat())
+            else:
+                converted_data[key] = value
+        
+        return cls(**converted_data)
+

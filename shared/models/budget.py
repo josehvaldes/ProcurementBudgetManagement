@@ -123,12 +123,20 @@ class Budget:
         """Get budget utilization percentage."""
         return self.consumption_rate
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict:
         result = asdict(self)
         result = convert_to_table_entity(result)
         return result
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Budget":
-        return Budget(**data)
+    def from_dict(cls, data: dict) -> "Budget":
+        converted_data = {}
+        for key, value in data.items():
+            # Convert TablesEntityDatetime to Python datetime
+            if hasattr(value, '__class__') and 'TablesEntityDatetime' in value.__class__.__name__:
+                converted_data[key] = datetime.fromisoformat(value.isoformat())
+            else:
+                converted_data[key] = value
+        
+        return cls(**converted_data)
 

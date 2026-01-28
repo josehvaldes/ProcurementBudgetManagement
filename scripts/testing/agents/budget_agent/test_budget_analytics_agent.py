@@ -1,3 +1,4 @@
+import json
 import pytest
 import pytest_asyncio
 
@@ -19,30 +20,30 @@ class TestBudgetAnalyticsAgent:
         agent = BudgetAnalyticsAgent()
         yield agent
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def invoice(self):
-        return {
-            "invoice_id": "INV-1001",
-            "amount": 1500.00,
-            "department_id": "FIN",
-            "category": "Consulting",
-            "project_id": "PROJ-001",
-            "vendor_name": "LINKSER S.A"
-        }
-    
-    @pytest.fixture
+        invoice_data_path = "scripts/data-source/invoices_data.json"
+        logger.info(f"Loading invoice data from {invoice_data_path}")
+
+        with open(invoice_data_path, "r") as f:
+            invoices_data = json.load(f)
+
+        return invoices_data[0]  # Use the first invoice for testing
+
+    @pytest_asyncio.fixture
     async def budget(self):
-        return {
-            "year": 2024,
-            "total_budget": 50000.00,
-            "spent_to_date": 20000.00
-        }
+        budget_data_path = "scripts/data-source/budgets_data.json"
+        logger.info(f"Loading budget data from {budget_data_path}")
+        with open(budget_data_path, "r") as f:
+            budget_data = json.load(f)
+
+        return budget_data[0]  # Use the first budget record for testing
 
     @pytest.mark.asyncio
     async def test_impact_analysis(self, tool: BudgetAnalyticsAgent, invoice: dict, budget: dict):
-        logger.info("Testing BudgetAnalyticsAgent ainvoke method...")
+        logger.info("Testing BudgetAnalyticsAgent impact_analysis method...")
 
-        result = await tool.impact_analysis(invoice=invoice,budget=budget)
+        result = await tool.impact_analysis(invoice=invoice, budget=budget)
 
         logger.info(f"Budget Analytics Agent Result: {result}")
         assert result is not None
