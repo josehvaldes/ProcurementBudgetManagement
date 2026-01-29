@@ -164,7 +164,3 @@ class TestValidationAgent:
         assert response.result == ValidationResult.INVALID
         assert any("not active" in msg.lower() for msg in response.messages)
 
-
-# For running tests directly with python (not recommended, use pytest instead)
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])

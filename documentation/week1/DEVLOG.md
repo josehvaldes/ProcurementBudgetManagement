@@ -317,18 +317,12 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
   - create a prompt for anomaly detection
   - create unit tests for new prompts and context summarize
   - Publish message with subject='invoice.budget_checked'
-- Create API endpoints for budget management (CRUD)
+- ✅ Create API endpoints for budget management (CRUD)
   - GET /budgets/{department}/{category}
   - GET /budgets/{department}/{project}/{category}
   - POST /budgets (create new budget allocation)
-  - PUT /budgets/{id} (update allocation)
   - GET /budgets/consumption (real-time consumption report)
-- Implement budget vs. actual comparison logic
-- Build alerting system for budget thresholds
-  - Email notifications for over-budget
-  - Slack/Teams webhooks (optional)
-- Create budget dashboard queries
-- Test budget allocation and tracking flows locally
+- ✅ Build alerting system for budget thresholds  
 
 ### Success Criteria
 - ✅ Invoices properly allocated to budgets

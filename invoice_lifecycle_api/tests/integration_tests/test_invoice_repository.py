@@ -24,7 +24,7 @@ setup_logging(
 logger = get_logger(__name__)
 
 @pytest.mark.asyncio(scope="class")
-class InvoiceRepositoryTests:
+class TestInvoiceRepository:
 
     @pytest_asyncio.fixture
     async def invoice_repository(self):
@@ -46,7 +46,7 @@ class InvoiceRepositoryTests:
     async def test_upsert_entity(self, invoice_repository: TableServiceInterface):
         invoice = Invoice(
             invoice_id=uuid.uuid4().hex[:12],
-            department_id=f"dept_{uuid.uuid4().hex[:6]}",
+            department_id=f"FIN",
             invoice_number=f"INV-{uuid.uuid4().hex[:6]}",
             source=InvoiceSource.API,
             document_type=DocumentType.INVOICE,

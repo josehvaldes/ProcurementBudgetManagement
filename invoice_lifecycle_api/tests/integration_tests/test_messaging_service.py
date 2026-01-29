@@ -25,7 +25,7 @@ setup_logging(
 logger = get_logger(__name__)
 
 
-class MessagingServiceTests:
+class TestMessagingService:
 
     def __init__(self):
         self.messaging_service: MessagingServiceInterface = None
@@ -144,7 +144,7 @@ class MessagingServiceTests:
         logger.info("Closed all repository services and credential manager.")
 
 async def main():
-    test_instance = MessagingServiceTests()
+    test_instance = TestMessagingService()
     test_instance.setup()
     test_instance.setup_method()
     

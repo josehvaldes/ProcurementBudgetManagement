@@ -35,7 +35,7 @@ class TestBudgetAnalyticsTools:
         logger.info("Testing get_invoices_by_vendor tool...")
 
         data = await get_invoices_by_vendor(
-            vendor_name = "LINKSER S.A",
+            vendor_name = "Adventure Logistics",
             months = 12
         )
         logger.info(f"Invoices by Vendor Data: {data}")

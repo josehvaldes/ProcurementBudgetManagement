@@ -30,7 +30,7 @@ async def seed_budgets(budgets: list[Budget]):
             # IT:PROJ-3001:Software
             row_key = f"{budget.department_id}:{budget.project_id}:{budget.category}"
 
-            budget.budget_id = uuid.uuid4().hex[:8]
+            budget.budget_id = uuid.uuid4().hex[:12]
             budget.compound_key = row_key
             budget_ids.append((budget.budget_id, row_key))
             logger.info(f"Queuing budget: {budget.compound_key} with Partition Key: {partition_key}")

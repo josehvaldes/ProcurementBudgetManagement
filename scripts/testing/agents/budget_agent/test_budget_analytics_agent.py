@@ -54,13 +54,13 @@ class TestBudgetAnalyticsAgent:
         historical_spending = await get_historical_spending_data(
             department_id="FIN",
             category="Consulting",
-            project_id="PROJ-002",
+            project_id="PROJ-001",
             budget_year=2024,
             months=12
         )
 
         vendor_invoices = await get_invoices_by_vendor(
-            vendor_name="LINKSER S.A",
+            vendor_name="Adventure Logistics",
             months=12
         )
 
@@ -80,13 +80,13 @@ class TestBudgetAnalyticsAgent:
         historical_spending = await get_historical_spending_data(
             department_id="FIN",
             category="Consulting",
-            project_id="PROJ-003",
+            project_id="PROJ-001",
             budget_year=2024,
             months=12
         )
 
         vendor_invoices = await get_invoices_by_vendor(
-            vendor_name="LINKSER S.A",
+            vendor_name="Adventure Logistics",
             months=12
         )
 

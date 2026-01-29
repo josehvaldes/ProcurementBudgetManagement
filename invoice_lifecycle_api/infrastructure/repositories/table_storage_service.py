@@ -45,6 +45,9 @@ class TableStorageService(TableServiceInterface):
 
         try:
             entity = await self.table_client.get_entity(partition_key=partition_key, row_key=row_key)
+            if not entity:
+                logger.info(f"No entity found with PartitionKey: {partition_key}, RowKey: {row_key}")
+                return None
             logger.info(f"Entity retrieved successfully. Row Key: {row_key}")
             return self._strip_metadata(dict(entity))
         except Exception as e:

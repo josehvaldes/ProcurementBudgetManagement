@@ -36,7 +36,6 @@ class Budget:
     budget_id: str  # UUID
     fiscal_year: str  # PartitionKey - e.g., "FY2024"
     department_id: str  # IT, HR
-    department_name: str
     category: str  # e.g., "Software", "Hardware"
     project_id: str  # Associated project ID
 

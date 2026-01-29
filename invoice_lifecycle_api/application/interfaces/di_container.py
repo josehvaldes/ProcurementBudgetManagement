@@ -1,5 +1,6 @@
 """Dependency Injection Container."""
 from invoice_lifecycle_api.application.interfaces.service_interfaces import MessagingServiceInterface, StorageServiceInterface, TableServiceInterface
+from invoice_lifecycle_api.application.services.budget_service import BudgetService
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import AzureCredentialManager, get_credential_manager
 from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
 from invoice_lifecycle_api.infrastructure.repositories.in_memory_invoice_storage import InMemoryInvoiceStorageService
@@ -73,6 +74,12 @@ def get_vendor_repository_service() -> TableServiceInterface:
                                   storage_account_url=settings.table_storage_account_url,
                                   table_name=settings.vendors_table_name)
 
+def get_budget_repository_service() -> TableServiceInterface:
+    """Dependency injection function for budget repository service."""
+    return _container.get_service(TableServiceInterface, 
+                                  storage_account_url=settings.table_storage_account_url,
+                                  table_name=settings.budgets_table_name)
+
 def get_invoice_storage_service():
     """Dependency injection function for invoice storage service."""
     return _container.get_service(StorageServiceInterface)
@@ -83,3 +90,9 @@ def get_event_choreographer_service():
     invoice_storage = _container.get_service(StorageServiceInterface)
     messaging_service = _container.get_service(MessagingServiceInterface)
     return EventChoreographer(table_repository, invoice_storage, messaging_service)
+
+
+def get_budget_service():
+    """Dependency injection function for budget manager service."""
+    table_repository = get_budget_repository_service()
+    return BudgetService(table_repository)

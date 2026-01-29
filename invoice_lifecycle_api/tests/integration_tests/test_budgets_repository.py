@@ -17,7 +17,7 @@ setup_logging(
 logger = get_logger(__name__)
 
 @pytest.mark.asyncio(scope="class")
-class BudgetsRepositoryTests:
+class TestBudgetsRepository:
 
     @pytest_asyncio.fixture
     async def tool(self):

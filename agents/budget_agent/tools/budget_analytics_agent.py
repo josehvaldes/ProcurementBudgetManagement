@@ -24,10 +24,12 @@ logger = get_logger(__name__)
 class BudgetAnalyticsOutcome(TypedDict):
     explanation: str
     confidence_score: float
+    outcomes: dict
 
-    def __init__(self, explanation: str, confidence_score: float):
+    def __init__(self, explanation: str, confidence_score: float, outcomes: dict):
         self.explanation = explanation
         self.confidence_score = confidence_score
+        self.outcomes = outcomes
 
 async def get_invoices_by_vendor(vendor_name: str, months: int = 12) -> list:
     """
@@ -250,5 +252,10 @@ class BudgetAnalyticsAgent:
         logger.info(context_result_content)
         return BudgetAnalyticsOutcome(
             explanation=context_result_content.get("explanation", ""),
-            confidence_score=context_result_content.get("confidence", 0.0)
+            confidence_score=context_result_content.get("confidence", 0.0),
+            outcomes = {
+                "budget_impact": impact_result_content,
+                "trend_analysis": trend_result_content,
+                "anomaly_detection": anomaly_result_content
+            }
         )
