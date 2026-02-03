@@ -2,8 +2,16 @@
 Approval Agent - Manages invoice approval workflow.
 """
 
+import asyncio
 from typing import Dict, Any, Optional
+
+from langsmith import traceable
+from shared.config.settings import settings
 from agents.base_agent import BaseAgent
+from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
+from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from shared.models.invoice import Invoice, InvoiceState
+from shared.models.vendor import Vendor
 from shared.utils.constants import InvoiceSubjects, SubscriptionNames
 
 
@@ -19,30 +27,51 @@ class ApprovalAgent(BaseAgent):
     - Publish appropriate message
     """
     
-    def __init__(self):
+    def __init__(self, shutdown_event: asyncio.Event = asyncio.Event()):
         super().__init__(
             agent_name="ApprovalAgent",
-            subscription_name=SubscriptionNames.APPROVAL_AGENT
+            subscription_name=SubscriptionNames.APPROVAL_AGENT,
+            shutdown_event=shutdown_event
         )
-    
-    def process_invoice(self, invoice_id: str, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        self.vendor_table_client = TableStorageService(
+            storage_account_url=settings.table_storage_account_url,
+            table_name=settings.vendors_table_name
+        )
+
+
+    async def release_resources(self) -> None:
+        """Release any resources held by the agent."""
+        pass
+
+    @traceable(name="approval_agent.process_invoice", tags=["approval", "agent"], metadata={"version": "1.0"})
+    async def process_invoice(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process invoice approval decision.
-        
         Args:
-            invoice_id: Invoice ID
             message_data: Message payload
             
         Returns:
             Result data for next state
         """
+        invoice_id = message_data["invoice_id"]
+        department_id = message_data["department_id"]
         self.logger.info(f"Processing approval for invoice {invoice_id}")
         
         # Get invoice from storage
-        invoice = self.get_invoice(invoice_id)
+        invoice = await self.get_invoice(department_id, invoice_id)
+
         if not invoice:
             raise ValueError(f"Invoice {invoice_id} not found")
-        
+
+        vendor_id = invoice.get("vendor_id")
+        if vendor_id is not None:
+            vendor = await self.vendor_table_client.get_entity(
+                partition_key="VENDOR", # partiotion key is fixed for vendors
+                row_key=vendor_id
+            )
+        else:
+            raise ValueError(f"Vendor ID missing for invoice {invoice_id}")
+
         # TODO: Implement approval logic
         # - Check if invoice meets auto-approval criteria
         # - Route for manual approval if needed
@@ -77,5 +106,5 @@ class ApprovalAgent(BaseAgent):
 
 if __name__ == "__main__":
     agent = ApprovalAgent()
-    agent.initialize()
-    agent.run()
+    agent.setup_signal_handlers()
+    asyncio.run(agent.run())

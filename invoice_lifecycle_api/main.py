@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from invoice_lifecycle_api.api import health, intake
+from invoice_lifecycle_api.api import budget, health, intake
 from invoice_lifecycle_api.application.interfaces.di_container import close_all_services
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.config.settings import settings
@@ -83,6 +83,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
 app.include_router(intake.router, prefix="/api/v1/intake", tags=["intake"])
+app.include_router(budget.router, prefix="/api/v1/budgets", tags=["budgets"])
 
 def run_production():
     """Entry point for the CLI script."""

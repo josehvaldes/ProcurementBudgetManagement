@@ -1,6 +1,8 @@
 ﻿import asyncio
 import signal
 import sys
+from agents.budget_agent.agent import BudgetAgent
+from agents.validation_agent.agent import ValidationAgent
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger, setup_logging
 from agents.intake_agent.agent import IntakeAgent
@@ -54,8 +56,8 @@ class AgentOrchestrator:
         """Start all agents as concurrent tasks."""
         agent_configs = [
             (IntakeAgent, "IntakeAgent"),
-            # (ValidationAgent, "ValidationAgent"),
-            # (BudgetAgent, "BudgetAgent"),
+            (ValidationAgent, "ValidationAgent"),
+            (BudgetAgent, "BudgetAgent"),
             # (ApprovalAgent, "ApprovalAgent"),
             # (PaymentAgent, "PaymentAgent"),
             # (AnalyticsAgent, "AnalyticsAgent"),

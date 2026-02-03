@@ -333,3 +333,53 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
 - ✅ Budget Agent runs locally and processes messages
 
 ---
+
+
+
+## Week 4: Approval Workflow & Payment Processing
+**Goal:** Complete the approval chain and payment scheduling automation
+
+### Key Deliverables
+- Approval Agent with rule-based decision engine **running locally**
+- Approval routing system (managers, escalation)
+- Payment Agent with scheduling logic **running locally**
+- Payment batch generation
+- End-to-end invoice-to-payment automation
+- Complete multi-agent runner script
+
+### Tasks
+- ✅ Set up Approval Agent Service Bus subscription
+  - Create receiver for approval-agent-subscription
+- ✅ Implement Approval Agent with LangChain
+  - Build auto-approval rules engine
+  - Create routing logic (department managers)
+  - Implement escalation workflows
+  - Add manual review queue handling
+  - Publish message with subject='invoice.approved' or 'invoice.manual_review'
+- Create approval notification system
+  - Email notifications to approvers
+  - **Generate SAS URLs for invoice file viewing** ⭐
+  - Webhook notifications (optional)
+- Build approval dashboard/API for stakeholders
+  - GET /approvals/pending (manual review queue)
+  - POST /approvals/{invoice_id}/approve
+  - POST /approvals/{invoice_id}/reject
+  - **GET /invoices/{id}/file (returns SAS URL)** ⭐
+- Set up Payment Agent Service Bus subscription
+  - Create receiver for payment-agent-subscription
+- Implement Payment Agent with LangChain
+  - Create payment scheduling logic (net-30, net-60)
+  - Build payment batch generation
+  - Implement vendor remittance notifications
+  - Publish message with subject='invoice.payment_scheduled'
+- Add payment status tracking
+- **Complete run_agents.py script**
+  - Start all 5 agents in separate processes
+  - Graceful shutdown handling
+  - Health check per agent
+- Implement state transitions: APPROVED → PAYMENT_SCHEDULED → PAID
+- Test complete pipeline from intake to payment **all running locally**
+- Add comprehensive integration tests
+  - End-to-end invoice processing
+  - Error handling scenarios
+  - State recovery scenarios
