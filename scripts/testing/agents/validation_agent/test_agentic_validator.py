@@ -1,12 +1,9 @@
-import asyncio
 import json
 
 import pytest
 
 from agents.validation_agent.tools.agentic_validator import AgenticValidator
 from shared.models.agentic import ValidatorAgenticResponse
-from shared.models.invoice import Invoice
-from shared.models.vendor import Vendor
 
 
 class TestAgenticValidator:
@@ -47,7 +44,7 @@ class TestAgenticValidator:
             print(f"Errors: {response.errors}")
             print(f"Recommended Actions: {response.recommended_actions}")
 
-        assert response.passed == True
+        assert response.passed
         assert len(response.errors) == 0
 
 

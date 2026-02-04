@@ -1,6 +1,4 @@
 import pytest
-from decimal import Decimal
-from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 from agents.budget_agent.tools.budget_classification_agent import BudgetClassificationAgent
 from shared.config.settings import settings

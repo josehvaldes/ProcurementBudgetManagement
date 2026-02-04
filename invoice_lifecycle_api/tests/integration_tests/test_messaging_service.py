@@ -1,5 +1,3 @@
-import pytest
-import pytest_asyncio
 
 import argparse
 import asyncio
@@ -7,7 +5,6 @@ import json
 import signal
 
 import traceback
-import uuid
 
 from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
 from shared.config.settings import settings
@@ -72,7 +69,7 @@ class TestMessagingService:
                     "invoice_id": invoice_data["invoice_id"],
                 }
             }
-            print(f"Sending test message to topic 'invoice-events'")
+            print("Sending test message to topic 'invoice-events'")
             await self.messaging_service.publish_message(settings.service_bus_topic_name, message_data)
             print(f"Sent test message with ID: {invoice_data['invoice_id']}")
 

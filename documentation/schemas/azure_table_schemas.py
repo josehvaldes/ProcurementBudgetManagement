@@ -6,8 +6,6 @@ This module defines the table schemas for Azure Storage Tables.
 Each schema includes partition key strategy, row key format, and all entity properties.
 """
 
-from datetime import datetime
-from typing import Optional, List, Dict
 from enum import Enum
 
 

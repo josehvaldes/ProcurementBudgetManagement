@@ -1,5 +1,5 @@
 import json
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
 import uuid
 
 import pytest
@@ -92,7 +92,7 @@ class TestValidationAgent:
         is_duplicate = await validator.has_duplicate(invoice)
         
         # Assert
-        assert is_duplicate == False
+        assert not is_duplicate
 
     @pytest.mark.asyncio
     async def test_duplicate_invoice_detection(self, validator, invoice, vendor):
@@ -113,7 +113,7 @@ class TestValidationAgent:
         is_duplicate = await validator.has_duplicate(invoice)
         
         # Assert
-        assert is_duplicate == True
+        assert is_duplicate
 
     @pytest.mark.asyncio
     async def test_missing_vendor_name(self, validator, invoice, vendor):

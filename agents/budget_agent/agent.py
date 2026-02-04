@@ -3,9 +3,8 @@ Budget Agent - Tracks and validates budget allocations.
 """
 
 import asyncio
-from datetime import datetime, timezone
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from langsmith import traceable
 
 from agents.budget_agent.tools.alert_notification_system import AlertNotificationSystem

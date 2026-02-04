@@ -4,7 +4,6 @@ from pyzbar.pyzbar import decode
 from PIL import Image
 import os
 import io
-import aiohttp
 from shared.models.qr_info import QRInfo
 
 

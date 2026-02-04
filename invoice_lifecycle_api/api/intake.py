@@ -7,12 +7,10 @@ along with metadata, triggering the invoice processing workflow.
 import traceback
 from typing import Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from invoice_lifecycle_api.domain.uploaded_file_dto import UploadedFileDTO
 from shared.utils.logging_config import get_logger
-from shared.config.settings import settings
 from invoice_lifecycle_api.application.services.event_choreographer import EventChoreographer
 from invoice_lifecycle_api.application.interfaces.di_container import get_event_choreographer_service
 from shared.models.invoice import Invoice, InvoiceSource
@@ -350,7 +348,7 @@ async def upload_invoice(
     except Exception as e:
         # Handle unexpected errors
         logger.error(f"Error in upload_invoice endpoint: {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.debug(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while processing the invoice upload"

@@ -13,7 +13,6 @@ from agents.validation_agent.tools.prompts import ValidationAgentPrompts
 from invoice_lifecycle_api.application.interfaces.service_interfaces import JoinOperator
 from shared.models.agentic import Metadata, ValidatorAgenticResponse
 from shared.models.invoice import Invoice
-from shared.models.vendor import Vendor
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 

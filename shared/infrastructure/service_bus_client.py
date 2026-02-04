@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Optional, Dict, Any
 from azure.servicebus import ServiceBusClient as AzureServiceBusClient, ServiceBusMessage
-from azure.servicebus import ServiceBusReceiver, ServiceBusSender
+from azure.servicebus import ServiceBusReceiver
 
 logger = logging.getLogger(__name__)
 

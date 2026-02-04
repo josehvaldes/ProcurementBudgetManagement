@@ -1,6 +1,4 @@
 import pytest
-from decimal import Decimal
-from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 from shared.config.settings import settings
 from agents.budget_agent.tools.budget_analytics_agent import get_historical_spending_data, get_invoices_by_vendor

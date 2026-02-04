@@ -2,8 +2,7 @@ import argparse
 import asyncio
 from azure.identity.aio import DefaultAzureCredential
 from azure.ai.documentintelligence.aio import DocumentIntelligenceClient
-from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentAnalysisFeature
-import os
+from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger, setup_logging
 

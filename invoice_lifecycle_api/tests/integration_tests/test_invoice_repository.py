@@ -1,12 +1,9 @@
 import pytest
 import pytest_asyncio
 
-import argparse
-import asyncio
 from datetime import datetime, timezone
 
 import json
-import traceback
 import uuid
 
 from shared.config.settings import settings
@@ -14,7 +11,7 @@ from shared.utils.logging_config import get_logger, setup_logging
 from shared.models.invoice import DocumentType, Invoice, InvoiceSource
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService
-from invoice_lifecycle_api.application.interfaces.service_interfaces import JoinOperator, StorageServiceInterface, TableServiceInterface
+from invoice_lifecycle_api.application.interfaces.service_interfaces import StorageServiceInterface, TableServiceInterface
 
 setup_logging(
         log_level=settings.log_level,
@@ -46,11 +43,11 @@ class TestInvoiceRepository:
     async def test_upsert_entity(self, invoice_repository: TableServiceInterface):
         invoice = Invoice(
             invoice_id=uuid.uuid4().hex[:12],
-            department_id=f"FIN",
+            department_id="FIN",
             invoice_number=f"INV-{uuid.uuid4().hex[:6]}",
             source=InvoiceSource.API,
             document_type=DocumentType.INVOICE,
-            source_email=f"test@test.com",
+            source_email="test@test.com",
             priority="high",
             file_name="invoice.pdf",
             file_type="application/pdf",
@@ -83,7 +80,7 @@ class TestInvoiceRepository:
 
     @pytest.mark.asyncio
     async def test_download_file(self, blob_repository: StorageServiceInterface):
-        blob_name = f"2025/12/22/invoice_3c4a78652c62.jpg"
+        blob_name = "2025/12/22/invoice_3c4a78652c62.jpg"
         container_name = settings.blob_container_name
         print(f"Downloading blob with name: {blob_name}")
         downloaded_content = await blob_repository.download_file(container_name, blob_name)
@@ -97,7 +94,7 @@ class TestInvoiceRepository:
     @pytest.mark.asyncio
     async def test_delete_file(self, blob_repository: StorageServiceInterface):
         container_name = settings.blob_container_name
-        blob_name = f"2025/12/22/invoice_3c4a78652c62.jpg"
+        blob_name = "2025/12/22/invoice_3c4a78652c62.jpg"
         print(f"Deleting blob with name: {blob_name}")
         await blob_repository.delete_file(container_name, blob_name)
         print(f"Deleted blob: {blob_name}")

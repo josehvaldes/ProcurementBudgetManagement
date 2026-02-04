@@ -2,7 +2,6 @@ from datetime import datetime
 from enum import Enum
 import json
 
-from pydantic import BaseModel
 
 def convert_to_table_entity(data: dict) -> dict:
     """Convert complex types to Azure Table Storage compatible types."""

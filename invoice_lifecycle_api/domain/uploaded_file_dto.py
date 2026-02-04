@@ -1,5 +1,5 @@
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 class UploadedFileDTO(BaseModel):
     """
     Data Transfer Object representing an uploaded file.

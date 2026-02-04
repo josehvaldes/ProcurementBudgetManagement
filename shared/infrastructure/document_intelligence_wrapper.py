@@ -4,9 +4,8 @@ Azure Document Intelligence client wrapper for OCR and document extraction.
 
 import logging
 from threading import RLock
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any
 from azure.ai.documentintelligence.aio import DocumentIntelligenceClient
-from azure.identity.aio import DefaultAzureCredential
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentAnalysisFeature, AnalyzeResult
 
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
@@ -234,7 +233,7 @@ class DocumentIntelligenceWrapper:
         field_names.extend(additional_fields)
 
         document_list = []
-        logger.info(f"Extracting receipt data from documents")
+        logger.info("Extracting receipt data from documents")
         for idx, document in enumerate(result.documents):
             logger.info(f"Extracting data from receipt document #{idx + 1}")
             document_data = {}

@@ -1,6 +1,5 @@
 import json
 import random
-from datetime import datetime
 
 # Define constants
 departments = ["IT", "HR", "FIN", "OPS", "MKT"]

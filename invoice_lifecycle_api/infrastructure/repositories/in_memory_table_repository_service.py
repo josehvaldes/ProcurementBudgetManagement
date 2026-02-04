@@ -1,4 +1,3 @@
-from shared.config.settings import settings
 from shared.models.invoice import Invoice
 from shared.utils.logging_config import get_logger
 from invoice_lifecycle_api.application.interfaces.service_interfaces import TableServiceInterface

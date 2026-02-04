@@ -1,8 +1,6 @@
 import asyncio
-from typing import AsyncIterator
 from azure.servicebus.aio import ServiceBusClient, ServiceBusReceiver
 from azure.servicebus import ServiceBusReceivedMessage
-from shared.config.settings import settings
 from shared.utils.logging_config import get_logger
 logger = get_logger(__name__)
 

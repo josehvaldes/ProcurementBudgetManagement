@@ -1,9 +1,3 @@
-import uuid
-import requests
-import time
-import json
-import sys
-import argparse
 
 from shared.config.settings import get_settings
 settings = get_settings()

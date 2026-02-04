@@ -1,13 +1,10 @@
 
 import json
-import operator
-from typing import Annotated, Optional, TypedDict
 from langchain_openai import AzureChatOpenAI
 
 from shared.config.settings import settings
 from agents.budget_agent.tools.prompts import BudgetAgentsPrompts
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
-from shared.utils.constants import DEPARTMENT_CATEGORIES, DEPARTMENT_IDS
 
 from shared.utils.logging_config import get_logger, setup_logging
 

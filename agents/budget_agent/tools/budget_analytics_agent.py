@@ -1,13 +1,8 @@
 
 import json
-import operator
-import traceback
-from typing import Annotated, Optional, TypedDict
-from langsmith import traceable
-from langchain.tools import tool
+from typing import TypedDict
 from langchain_openai import AzureChatOpenAI
-from langchain.agents import create_agent
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage
 
 from agents.budget_agent.tools.prompts import BudgetAgentsPrompts
 from documentation.schemas.azure_table_schemas import InvoiceState
@@ -137,7 +132,7 @@ class BudgetAnalyticsAgent:
             budget=budget
         )
 
-        logger.info(f"Invoke Impact Analysis")
+        logger.info("Invoke Impact Analysis")
         impact_result: AIMessage = await self.llm.ainvoke(messages)
 
         logger.info(f"Impact Analysis Result: {impact_result.content}")

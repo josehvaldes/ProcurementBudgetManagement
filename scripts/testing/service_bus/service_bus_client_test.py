@@ -1,5 +1,4 @@
 import argparse
-import os
 import asyncio
 from azure.servicebus import ServiceBusMessage, ServiceBusSender
 from azure.servicebus.aio import ServiceBusClient

@@ -1,6 +1,5 @@
 import pytest
 import pytest_asyncio
-import traceback
 
 from shared.config.settings import settings
 from shared.models.budget import Budget

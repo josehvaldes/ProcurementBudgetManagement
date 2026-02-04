@@ -5,7 +5,7 @@ Budget domain model.
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from enum import Enum
 
 from shared.utils.convert import convert_to_table_entity

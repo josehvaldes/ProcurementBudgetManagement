@@ -1,14 +1,9 @@
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, Mock, mock_open, patch, MagicMock
+from unittest.mock import AsyncMock
 
-import argparse
-import asyncio
-from datetime import datetime, timezone
 
 import json
-import traceback
-import uuid
 
 from invoice_lifecycle_api.application.services.event_choreographer import EventChoreographer
 from invoice_lifecycle_api.domain.uploaded_file_dto import UploadedFileDTO
@@ -16,8 +11,6 @@ from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service i
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.models.invoice import Invoice, InvoiceState
-from shared.models.budget import Budget
-from invoice_lifecycle_api.application.services.budget_service import BudgetService
 from invoice_lifecycle_api.application.interfaces.service_interfaces import MessagingServiceInterface, TableServiceInterface
 
 setup_logging(

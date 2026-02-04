@@ -5,15 +5,11 @@ This module provides RESTful API endpoints for creating, retrieving, and
 analyzing budget records across departments and fiscal years.
 """
 from datetime import datetime
-import traceback
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from shared.config.settings import settings
 from shared.utils.logging_config import get_logger
-from invoice_lifecycle_api.application.interfaces.service_interfaces import TableServiceInterface
 from invoice_lifecycle_api.application.services.budget_service import BudgetService
 from shared.models.budget import Budget
 from invoice_lifecycle_api.application.interfaces.di_container import get_budget_service

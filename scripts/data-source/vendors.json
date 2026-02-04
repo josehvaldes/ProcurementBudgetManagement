@@ -1,6 +1,6 @@
 [
     {
-        "vendor_id": "1",
+        "vendor_id": "0d93c72a3dfa",
         "name": "Contoso Supplies",
         "display_name": "Contoso Supplies Ltd.",
         "tax_id": "98-7654321",
@@ -62,7 +62,7 @@
         "updated_by": "procurement_manager"
     },
     {
-        "vendor_id": "2",
+        "vendor_id": "1b42db41d674",
         "name": "Fabrikam Cloud Services",
         "display_name": "Fabrikam Cloud Services Inc.",
         "tax_id": "12-3456789",
@@ -124,7 +124,7 @@
         "updated_by": "it_director"
     },
     {
-        "vendor_id": "3",
+        "vendor_id": "20b238515800",
         "name": "Northwind Consulting",
         "display_name": "Northwind Consulting Group",
         "tax_id": "23-4567890",
@@ -179,7 +179,7 @@
         "updated_by": "finance_team"
     },
     {
-        "vendor_id": "4",
+        "vendor_id": "4eda3a25a6b9",
         "name": "Adventure Logistics",
         "display_name": "Adventure Works Logistics Ltd.",
         "tax_id": "34-5678901",

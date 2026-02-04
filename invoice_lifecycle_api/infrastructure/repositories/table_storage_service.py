@@ -1,5 +1,4 @@
 import traceback
-from enum import Enum
 from azure.data.tables.aio import TableClient
 
 from shared.utils.constants import CompoundKeyStructure

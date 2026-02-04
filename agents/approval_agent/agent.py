@@ -3,17 +3,13 @@ Approval Agent - Manages invoice approval workflow.
 """
 
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from langsmith import traceable
 from shared.config.settings import settings
 from agents.base_agent import BaseAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.utils.constants import InvoiceSubjects, SubscriptionNames
-from shared.models.invoice import Invoice, InvoiceState
-from shared.models.vendor import Vendor
-from shared.utils.constants import InvoiceSubjects, SubscriptionNames
-
 
 class ApprovalAgent(BaseAgent):
     """
@@ -69,6 +65,11 @@ class ApprovalAgent(BaseAgent):
                 partition_key="VENDOR", # partiotion key is fixed for vendors
                 row_key=vendor_id
             )
+            if not vendor:
+                raise ValueError(f"Vendor {vendor_id} not found for invoice {invoice_id}")
+
+            self.logger.info(f"Vendor {vendor.get('name')} found for invoice {invoice_id}")
+
         else:
             raise ValueError(f"Vendor ID missing for invoice {invoice_id}")
 

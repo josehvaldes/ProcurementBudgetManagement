@@ -1,18 +1,12 @@
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, Mock, mock_open, patch, MagicMock
+from unittest.mock import AsyncMock
 
-import argparse
-import asyncio
-from datetime import datetime, timezone
 
 import json
-import traceback
-import uuid
 
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger, setup_logging
-from shared.models.invoice import Invoice
 from shared.models.budget import Budget
 from invoice_lifecycle_api.application.services.budget_service import BudgetService
 from invoice_lifecycle_api.application.interfaces.service_interfaces import TableServiceInterface
@@ -61,7 +55,7 @@ class TestBudgetService:
         assert result is not None
         assert result.budget_id == budget_id
         mock_budget_repository.query_entities_with_filters.assert_called_once()
-        logger.info(f"✓ test_get_budget_by_id_success passed")
+        logger.info("✓ test_get_budget_by_id_success passed")
     
     @pytest.mark.asyncio
     async def test_get_budget_by_id_not_found(self, budget_service, mock_budget_repository):
@@ -74,7 +68,7 @@ class TestBudgetService:
 
         assert result is None
         mock_budget_repository.query_entities_with_filters.assert_called_once()
-        logger.info(f"✓ test_get_budget_by_id_not_found passed")
+        logger.info("✓ test_get_budget_by_id_not_found passed")
     
     @pytest.mark.asyncio
     async def test_get_budget_with_compound_key(self, budget_service: BudgetService, mock_budget_repository, sample_budget):
@@ -92,7 +86,7 @@ class TestBudgetService:
         assert result.project_id == project_id
         assert result.category == category
         mock_budget_repository.get_entity.assert_called_once()
-        logger.info(f"✓ test_get_budget_with_compound_key passed")
+        logger.info("✓ test_get_budget_with_compound_key passed")
 
 
     @pytest.mark.asyncio
@@ -103,7 +97,7 @@ class TestBudgetService:
         await budget_service.create_budget(budget)
 
         mock_budget_repository.upsert_entity.assert_called_once()
-        logger.info(f"✓ test_create_budget passed")
+        logger.info("✓ test_create_budget passed")
         print(mock_budget_repository.upsert_entity.call_args[0][0])
         assert mock_budget_repository.upsert_entity.call_args[0][0].get("status") == "frozen"
         assert mock_budget_repository.upsert_entity.call_args[0][0].get("budget_id") is not None
@@ -123,7 +117,7 @@ class TestBudgetService:
         assert results[0].department_id == department_id
         assert results[0].category == category
         mock_budget_repository.query_compound_key.assert_called_once()
-        logger.info(f"✓ test_search_budgets passed")
+        logger.info("✓ test_search_budgets passed")
 
 
     @pytest.mark.asyncio
@@ -149,4 +143,4 @@ class TestBudgetService:
         
         assert report is not None
         mock_budget_repository.query_compound_key.assert_called_once()
-        logger.info(f"✓ test_generate_consumption_report passed")
+        logger.info("✓ test_generate_consumption_report passed")

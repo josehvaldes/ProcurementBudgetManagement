@@ -1,6 +1,5 @@
 import asyncio
 import json
-import uuid
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger, setup_logging

@@ -8,7 +8,6 @@ from shared.utils.logging_config import get_logger, setup_logging
 from azure.servicebus.aio.management import ServiceBusAdministrationClient
 from azure.servicebus.management import SubscriptionRuntimeProperties
 from azure.identity.aio import DefaultAzureCredential
-from azure.data.tables.aio import TableClient
 from shared.models.invoice import InvoiceState
 from invoice_lifecycle_api.application.interfaces.service_interfaces import CompareOperator, JoinOperator
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
