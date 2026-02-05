@@ -36,9 +36,9 @@ class TestBudgetClassificationAgent:
         result = await agent.ainvoke(input_data)
         logger.info(f"Classification Result: {result}")
         assert result is not None
-        assert result.get('department', None) == "IT"
-        assert result.get('category', None) == "Software"
-        assert result.get('confidence', 0) > 0.8
+        assert result.department == "IT"
+        assert result.category == "Software"
+        assert result.confidence > 0.8
 
     @pytest.mark.asyncio
     async def test_failed_budget_classification(self, tool):

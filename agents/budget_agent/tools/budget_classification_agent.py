@@ -1,6 +1,7 @@
 
 import json
 from langchain_openai import AzureChatOpenAI
+from pydantic import BaseModel, Field, field_validator
 
 from shared.config.settings import settings
 from agents.budget_agent.tools.prompts import BudgetAgentsPrompts
@@ -14,11 +15,19 @@ setup_logging(log_level=settings.log_level,
 
 logger = get_logger(__name__)
 
-class BudgetClassificationOutcome:
-    department: str
-    category: str
-    confidence: float
-    reasoning: str
+class BudgetClassificationOutcome(BaseModel):
+    """Result of budget classification by LLM."""
+    department: str = Field(..., description="Classified department ID")
+    category: str = Field(..., description="Budget category")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score between 0 and 1")
+    reasoning: str = Field(..., description="Brief explanation of classification")
+    
+    @field_validator('confidence')
+    @classmethod
+    def validate_confidence(cls, v: float) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError('Confidence must be between 0 and 1')
+        return v
 
 
 class BudgetClassificationAgent:
@@ -36,16 +45,14 @@ class BudgetClassificationAgent:
         )
 
 
-    async def ainvoke(self, input:dict) -> dict:
+    async def ainvoke(self, input:dict) -> BudgetClassificationOutcome:
         errors = []
         invoice:dict = input.get("invoice", None)
         if invoice is None:
             errors.append("Invoice information is required for validation with vendor.")
 
         if len(errors) > 0:
-            return {
-                "errors": errors
-            }
+            raise ValueError(" ; ".join(errors))
 
         messages = BudgetAgentsPrompts.build_budget_classification_prompt(
             context=invoice,
@@ -58,4 +65,4 @@ class BudgetClassificationAgent:
             raise ValueError("No response from LLM for budget classification.")
         logger.info(result.content)
         json_result = json.loads(result.content)
-        return json_result
+        return BudgetClassificationOutcome(**json_result)
