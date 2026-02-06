@@ -30,7 +30,7 @@ class TestBudgetsRepository:
     @pytest.mark.asyncio
     async def test_query_single_entity(self, tool: TableServiceInterface):
         logger.info("Testing single entity query for IT-1 department, PROJ-2026, Software category in FY2026")
-        row_key = "IT:PROJ-2026:Software"
+        row_key = "IT:PROJ01-2026:Software"
         filters = [("PartitionKey", "FY2026"), ("RowKey", row_key)]
         entities = await tool.query_entities(filters, join_operator=JoinOperator.AND)
         for entity in entities:

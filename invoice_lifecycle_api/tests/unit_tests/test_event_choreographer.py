@@ -83,14 +83,14 @@ class TestEventChoreographer:
 
         data = {
             "subject": "invoice.created",
-                "body": {
-                    "invoice_id": invoice_id,
-                    "event_type": "APIInvoiceGenerated",
-                    "department_id": sample_invoice.department_id,
-                }
+            "correlation_id": invoice_id,
+            "body": {
+                "invoice_id": invoice_id,
+                "event_type": "APIInvoiceGenerated",
+                "department_id": sample_invoice.department_id,
+            }
         }
 
-        
         assert invoice_id is not None
         assert sample_invoice.state == InvoiceState.CREATED
         assert sample_invoice.raw_file_url == blob_url

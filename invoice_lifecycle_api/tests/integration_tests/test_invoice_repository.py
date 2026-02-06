@@ -7,6 +7,7 @@ import json
 import uuid
 
 from shared.config.settings import settings
+from shared.utils.exceptions import EntityNotFoundException
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.models.invoice import DocumentType, Invoice, InvoiceSource
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
@@ -80,7 +81,7 @@ class TestInvoiceRepository:
 
     @pytest.mark.asyncio
     async def test_download_file(self, blob_repository: StorageServiceInterface):
-        blob_name = "2025/12/22/invoice_3c4a78652c62.jpg"
+        blob_name = "2025/12/26/FIN-01/584708294422_20251216_152553.jpg"
         container_name = settings.blob_container_name
         print(f"Downloading blob with name: {blob_name}")
         downloaded_content = await blob_repository.download_file(container_name, blob_name)
@@ -88,13 +89,11 @@ class TestInvoiceRepository:
 
         assert downloaded_content is not None
         assert len(downloaded_content) > 0
-        with open("./scripts/poc/sample_documents/receipts/received_invoice_3c4a78652c62.jpg", "wb") as f:
-            f.write(downloaded_content)
 
     @pytest.mark.asyncio
     async def test_delete_file(self, blob_repository: StorageServiceInterface):
         container_name = settings.blob_container_name
-        blob_name = "2025/12/22/invoice_3c4a78652c62.jpg"
+        blob_name = "2025/12/26/FIN-01/584708294422_20251216_152553.jpg"
         print(f"Deleting blob with name: {blob_name}")
         await blob_repository.delete_file(container_name, blob_name)
         print(f"Deleted blob: {blob_name}")
@@ -102,8 +101,8 @@ class TestInvoiceRepository:
 
     @pytest.mark.asyncio
     async def test_get_entity(self, invoice_repository: TableServiceInterface):
-        partition_key = "dept_8d6014"
-        row_key = "d7224a169011"
+        partition_key = "FIN"
+        row_key = "865ce3705266"
         print(f"Retrieving entity with Partition Key: {partition_key}, Row Key: {row_key}")
         entity = await invoice_repository.get_entity(partition_key, row_key)
         invoice: Invoice = Invoice.from_dict(entity) if entity else None
@@ -112,12 +111,25 @@ class TestInvoiceRepository:
         else:
             print("Entity not found.")
         assert invoice is not None
+    
+    @pytest.mark.asyncio
+    async def test_not_found_entity(self, invoice_repository: TableServiceInterface):
+        partition_key = "NON_EXISTENT_PARTITION"
+        row_key = "NON_EXISTENT_ROW"
+        print(f"Attempting to retrieve non-existent entity with Partition Key: {partition_key}, Row Key: {row_key}")
+        try:
+            entity = await invoice_repository.get_entity(partition_key, row_key)
+            print(f"Retrieved entity: {entity}")
+            assert False, "Expected an exception for non-existent entity, but got a result."
+        except EntityNotFoundException as e:
+            print(f"Expected exception for non-existent entity: {e}")
+            assert True
 
     @pytest.mark.asyncio
-    async def save_to_file_entity(self, invoice_repository: TableServiceInterface):
+    async def test_save_to_file_entity(self, invoice_repository: TableServiceInterface):
         file_path = "./scripts/poc/sample_documents/invoice_entity.json"
-        partition_key = "kitchen-01"
-        row_key = "96686795c22a"
+        partition_key = "FIN"
+        row_key = "8d9e0f1g2h3i"
         logger.info(f"Saving entity to file: {partition_key}, Row Key: {row_key}")
         entity = await invoice_repository.get_entity(partition_key, row_key)
         with open(file_path, "w") as f:

@@ -5,6 +5,7 @@ import json
 import signal
 
 import traceback
+import uuid
 
 from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
 from shared.config.settings import settings
@@ -56,10 +57,12 @@ class TestMessagingService:
         
     async def test_send_message(self):
         try:
+            invoice_id = uuid.uuid4().hex[:12]
             invoice_data = {
-                "invoice_id": "584708294422",
+                "invoice_id": invoice_id,
                 "event_type": "TestGenerated",
                 "department_id": "FIN-01",
+                "correlation_id": invoice_id
             }
             message_data = {
                 "subject": "invoice.created",
@@ -67,7 +70,8 @@ class TestMessagingService:
                     "event_type": invoice_data["event_type"],
                     "department_id": invoice_data["department_id"],
                     "invoice_id": invoice_data["invoice_id"],
-                }
+                },
+                "correlation_id": invoice_data["correlation_id"]
             }
             print("Sending test message to topic 'invoice-events'")
             await self.messaging_service.publish_message(settings.service_bus_topic_name, message_data)
