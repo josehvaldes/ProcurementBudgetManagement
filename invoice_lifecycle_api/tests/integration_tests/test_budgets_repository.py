@@ -41,7 +41,7 @@ class TestBudgetsRepository:
     @pytest.mark.asyncio
     async def test_query_lt_gt_filter_unique(self, tool: TableServiceInterface):
         logger.info("Testing lt/gt filters to query budgets for Advertising category in FY2026")
-        compound_key = f"IT{CompoundKeyStructure.LOWER_BOUND.value}PROJ01-2026{CompoundKeyStructure.LOWER_BOUND.value}Software"
+        compound_key = f"IT{CompoundKeyStructure.LOWER_BOUND.value}PROJ01-2026{CompoundKeyStructure.LOWER_BOUND.value}"
         entities = await tool.query_compound_key("FY2026", compound_key)
         for entity in entities:
             budget: Budget = Budget.from_dict(entity)

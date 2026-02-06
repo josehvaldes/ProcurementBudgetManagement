@@ -269,7 +269,7 @@ class TableStorageService(TableServiceInterface):
         filter_query = "PartitionKey eq @partition_key and RowKey ge @lower and RowKey lt @upper"
         parameters = {
             "partition_key": partition_key,
-            "lower": f"{row_key}",
+            "lower": f"{row_key}{CompoundKeyStructure.UPPER_BOUND.value}",
             "upper": f"{row_key}{CompoundKeyStructure.UPPER_BOUND.value}"
         }
         

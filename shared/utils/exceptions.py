@@ -74,3 +74,23 @@ class EntityNotFoundException(TableStorageException):
     """Exception raised when an entity is not found in table storage."""
     pass
 
+
+
+class BudgetServiceException(Exception):
+    """Base exception for budget service operations."""
+    pass
+
+
+class BudgetValidationException(BudgetServiceException):
+    """Exception raised when budget data validation fails."""
+    pass
+
+
+class BudgetCreationException(BudgetServiceException):
+    """Exception raised when budget creation fails."""
+    pass
+
+
+class BudgetRetrievalException(BudgetServiceException):
+    """Exception raised when budget retrieval fails."""
+    pass
