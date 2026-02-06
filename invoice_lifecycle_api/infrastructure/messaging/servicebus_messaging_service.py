@@ -33,7 +33,8 @@ class ServiceBusMessagingService(MessagingServiceInterface):
         message = ServiceBusMessage(
             content_type='application/json',
             subject=message_data["subject"],                
-            body=json.dumps(message_data["body"]),                
+            body=json.dumps(message_data["body"]),
+            correlation_id=message_data["correlation_id"]
         )
         await sender.send_messages(message)
         logger.info("Message sent successfully.")

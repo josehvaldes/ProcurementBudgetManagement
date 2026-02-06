@@ -419,7 +419,8 @@ class BaseAgent(ABC):
             body = json.loads(str(message))
             invoice_id = body.get("invoice_id")
             department_id = body.get("department_id")
-            correlation_id = body.get("correlation_id", invoice_id)
+            correlation_id = message.correlation_id if message.correlation_id else invoice_id
+            
             
             # Validate required fields
             if not invoice_id or not department_id:
@@ -467,11 +468,14 @@ class BaseAgent(ABC):
             invoice_state = processing_result.get("state")
             
             # Handle state-specific logic
-            if invoice_state == InvoiceState.VALIDATED.value:
-                # Successful validation - publish next state message
+            if invoice_state == InvoiceState.EXTRACTED.value or \
+               invoice_state == InvoiceState.VALIDATED.value or \
+               invoice_state == InvoiceState.BUDGET_CHECKED.value:
+                
+                # Successful states - publish next state message
                 await self._publish_next_state(invoice_id, processing_result)
                 self.logger.info(
-                    f"Invoice validated successfully",
+                    f"Invoice successfully processed to state {invoice_state}",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,

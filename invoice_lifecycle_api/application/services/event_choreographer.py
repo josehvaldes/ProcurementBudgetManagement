@@ -53,6 +53,7 @@ class EventChoreographer:
             #step 3 - send notification to ServiceBus topic
             data = {
                 "subject": "invoice.created",
+                "correlation_id": invoice.invoice_id,
                 "body": {
                     "invoice_id": invoice.invoice_id,
                     "event_type": "APIInvoiceGenerated",

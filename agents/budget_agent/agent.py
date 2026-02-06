@@ -28,8 +28,7 @@ from shared.utils.constants import CompoundKeyStructure, InvoiceSubjects, Subscr
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
     BudgetException,
-    StorageException,
-    ValidationException
+    StorageException
 )
 
 
@@ -195,9 +194,6 @@ class BudgetAgent(BaseAgent):
         # Extract and validate message data
         invoice_id = message_data.get("invoice_id")
         department_id = message_data.get("department_id")
-        category = message_data.get("category")
-        project_id = message_data.get("project_id", "GEN-0")
-        budget_year = message_data.get("budget_year", "FY2025")
         correlation_id = message_data.get("correlation_id", invoice_id)
         
         if not invoice_id or not department_id:
@@ -208,9 +204,6 @@ class BudgetAgent(BaseAgent):
             extra={
                 "invoice_id": invoice_id,
                 "department_id": department_id,
-                "category": category,
-                "project_id": project_id,
-                "budget_year": budget_year,
                 "correlation_id": correlation_id,
                 "agent": self.agent_name
             }
@@ -223,7 +216,11 @@ class BudgetAgent(BaseAgent):
                 invoice_id=invoice_id,
                 correlation_id=correlation_id
             )
-            
+
+            budget_year = invoice_data.get("budget_year", None)
+            category = invoice_data.get("category", None)
+            project_id = invoice_data.get("project_id", None)
+
             # Step 2: Classify invoice into budget category
             classification = await self._classify_invoice_category(
                 invoice_data=invoice_data,
