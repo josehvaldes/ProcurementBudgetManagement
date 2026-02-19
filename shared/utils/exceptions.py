@@ -94,3 +94,41 @@ class BudgetCreationException(BudgetServiceException):
 class BudgetRetrievalException(BudgetServiceException):
     """Exception raised when budget retrieval fails."""
     pass
+
+class BudgetNotFoundException(BudgetServiceException):
+    """Exception raised when a budget is not found."""
+    pass
+
+# Approval Agent specific exceptions
+
+class InvoiceApprovalException(ProcurementException):
+    """Base exception for invoice approval errors."""
+    pass
+
+
+class InvoiceAlreadyApprovedException(InvoiceApprovalException):
+    """Raised when an invoice is already approved."""
+    pass
+
+
+class InvoiceApprovalTimeoutException(InvoiceApprovalException):
+    """Raised when invoice approval takes too long."""
+    pass
+
+
+class InvoiceApprovalFailedException(InvoiceApprovalException):
+    """Raised when invoice approval fails."""
+    pass
+
+
+# Vendor-related exceptions
+
+class VendorNotFoundException(ProcurementException):
+    """Raised when a vendor cannot be found in the system."""
+    pass
+
+
+# general exceptions
+class FileLoadException(Exception):
+    """Raised when loading a file (e.g., approval policy) fails."""
+    pass

@@ -1,0 +1,40 @@
+approver_roles:
+  project_manager: "Project Manager"
+  department_director: "Department Director"
+  cfo: "Chief Financial Officer"
+
+authority_matrix:
+  project_manager: 5000 USD
+  department_director: 25000 USD
+  cfo: 100000 USD
+
+
+segregation_of_duties:
+  purchaser_cannot_approve: true
+  submitter_cannot_approve: true
+  same_department_finance: true
+  two_approver_threshold: 50000
+
+timing_controls:
+  fiscal_period_end_days: 3
+  vendor_invoice_frequency_days: 7
+  vendor_invoice_frequency_max: 3
+  stale_invoice_days: 90
+
+warning_risk_factors:
+    - missing_documentation
+    - new_vendor
+    - unusual_purchase_pattern
+    - non_compliant_vendor
+    - budget_exceeded
+
+high_risk_factors:
+    - segregation_violation
+    - gaming_detected
+    - new_vendor_high_amount
+    - gambling_related
+    - high_risk_vendor
+    - illegal_activity
+
+  
+  
