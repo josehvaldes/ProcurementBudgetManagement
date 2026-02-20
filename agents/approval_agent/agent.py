@@ -556,26 +556,37 @@ class ApprovalAgent(BaseAgent):
         approval_decision:ApprovalDecision
 
         if vendor_active and vendor_approved and vendor_auto_approve:
-            if vendor_auto_approve_limit and amount > vendor_auto_approve_limit:
-                approval_decision = ApprovalDecision(
-                    status=ApprovalStatus.MANUAL_APPROVAL_REQUIRED,
-                    reason=f"Amount exceeds vendor auto-approval limit of {vendor_auto_approve_limit}"
-                )
-            if budget_approval_required_over and amount > budget_approval_required_over:
-                approval_decision = ApprovalDecision(
-                    status=ApprovalStatus.MANUAL_APPROVAL_REQUIRED,
-                    reason=f"Amount exceeds budget approval required limit of {budget_approval_required_over}"
-                )
-            if budget_auto_approve_under and amount < budget_auto_approve_under:
-                approval_decision = ApprovalDecision(
-                    status=ApprovalStatus.AUTO_APPROVED,
-                    reason=f"Amount is below budget auto-approval threshold of {budget_auto_approve_under}"
-                )
             if budget_status != BudgetStatus.ACTIVE:
                 approval_decision = ApprovalDecision(
                     status=ApprovalStatus.REJECTED,
                     reason=f"Budget status is {budget_status}, not active"
                 )
+            elif vendor_auto_approve_limit and amount > vendor_auto_approve_limit:
+                approval_decision = ApprovalDecision(
+                    status=ApprovalStatus.MANUAL_APPROVAL_REQUIRED,
+                    reason=f"Amount exceeds vendor auto-approval limit of {vendor_auto_approve_limit}"
+                )
+            elif budget_approval_required_over and amount > budget_approval_required_over:
+                approval_decision = ApprovalDecision(
+                    status=ApprovalStatus.MANUAL_APPROVAL_REQUIRED,
+                    reason=f"Amount exceeds budget approval required limit of {budget_approval_required_over}"
+                )
+
+            elif budget_auto_approve_under and amount < budget_auto_approve_under:
+                approval_decision = ApprovalDecision(
+                    status=ApprovalStatus.AUTO_APPROVED,
+                    reason=f"Amount is below budget auto-approval threshold of {budget_auto_approve_under}"
+                )
+            else:
+                approval_decision = ApprovalDecision(
+                    status=ApprovalStatus.REJECTED,
+                    reason="Amount does not meet auto-approval criteria based on vendor and budget thresholds"
+                )
+        else:
+            approval_decision = ApprovalDecision(
+                status=ApprovalStatus.REJECTED,
+                reason="Vendor does not meet auto-approval criteria (active, approved, auto_approve)"
+            )
 
         if approval_decision.status == ApprovalStatus.AUTO_APPROVED:
             self.logger.info(

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import AIMessage
 
+from agents.approval_agent.tools.constants import get_static_approval_policy
 from shared.config.settings import settings
 from agents.approval_agent.tools.prompts import ApprovalAgentPrompts
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
@@ -57,15 +58,11 @@ class ApprovalAnalyticsAgent:
                 logger.error(f"Approval analytics invocation failed: {errors}")
                 raise ValueError(" ; ".join(errors))
 
-            # load approval policy from yaml file
-            approval_policy = None
-            try:
-                with open("agents/approval_agent/tools/approval_policy.yaml", "r") as f:
-                    approval_policy = f.read()
-            except Exception as e:
-                logger.error(f"Failed to load approval policy: {e}")
-                errors.append("Unable to load approval policy for analytics.")
-                raise FileLoadException("Failed to load approval policy")
+            approval_policy = get_static_approval_policy()
+            if approval_policy == None:
+                logger.error("Approval policy is empty or not found.")
+                raise FileLoadException("Approval policy is empty or not found.")
+
 
             context_messages = ApprovalAgentPrompts.build_approval_decision_prompt(
                 invoice=invoice,
