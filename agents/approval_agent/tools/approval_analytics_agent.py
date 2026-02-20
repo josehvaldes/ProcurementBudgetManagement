@@ -1,8 +1,9 @@
 from typing import Any
 
 import json
-from langchain_openai import AzureChatOpenAI
 from pydantic import BaseModel, Field
+from langchain_openai import AzureChatOpenAI
+from langchain_core.messages import AIMessage
 
 from shared.config.settings import settings
 from agents.approval_agent.tools.prompts import ApprovalAgentPrompts
@@ -19,7 +20,7 @@ logger = get_logger(__name__)
 class ApprovalAnalyticsOutcome(BaseModel):
     risk_level: str = Field(..., description="Risk level of the invoice (e.g., low, medium, high)")
     risk_factors: list[str] = Field(..., description="List of identified risk factors")
-    risk_score: float = Field(..., ge=0.0, le=1.0, description="Overall risk score between 0 and 1")
+    risk_score: float = Field(..., ge=0.0, le=100.0, description="Overall risk score between 0 and 100")
     reasoning: str = Field(..., description="Brief explanation of the risk assessment")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score of the analysis between 0 and 1")
     suggested_approver: str = Field(..., description="AI-suggested approver for the invoice")
@@ -66,7 +67,7 @@ class ApprovalAnalyticsAgent:
                 errors.append("Unable to load approval policy for analytics.")
                 raise FileLoadException("Failed to load approval policy")
 
-            messages = ApprovalAgentPrompts.build_approval_decision_prompt(
+            context_messages = ApprovalAgentPrompts.build_approval_decision_prompt(
                 invoice=invoice,
                 budget=budget,
                 vendor=vendor,
@@ -74,13 +75,14 @@ class ApprovalAnalyticsAgent:
             )
 
             # Call the LLM with the constructed messages
-            response = await self.llm(messages)
+            response: AIMessage = await self.llm.ainvoke(context_messages)
             if not response or not response.content:
                 logger.error("No response from LLM for approval analytics.")
                 raise ValueError("No response from LLM for approval analytics.")
 
             # Process the LLM response and extract relevant information
             outcome = json.loads(response.content)
+            logger.info(f"Approval analytics outcome: {outcome}")
             return ApprovalAnalyticsOutcome(**outcome)
 
         except Exception as e:

@@ -15,7 +15,7 @@ setup_logging(
     )
 logger = get_logger(__name__)
 
-json_filename = "scripts/data-source/vendors.json"
+json_filename = "scripts/data-source/vendors_data.json"
 
 vendor_table_client = TableStorageService(storage_account_url=settings.table_storage_account_url,
                                            table_name=settings.vendors_table_name,
