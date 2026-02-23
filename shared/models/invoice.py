@@ -21,7 +21,13 @@ class InvoiceState(str, Enum):
     FAILED = "FAILED"
     MANUAL_REVIEW = "MANUAL_REVIEW"
     PENDING_APPROVAL = "PENDING_APPROVAL"
+    REJECTED = "REJECTED"
 
+class ReviewStatus(str, Enum):
+    """Invoice review status."""
+    NOT_REVIEWED = "NOT_REVIEWED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 class Priority(str, Enum):
     """Invoice priority levels."""
@@ -118,9 +124,10 @@ class Invoice:
     # ========== VALIDATION & APPROVAL ==========
     validation_passed: bool = False
     approval_required: bool = False
-    approved_by: Optional[str] = None
     ai_suggested_approver: Optional[str] = None
-    approved_date: Optional[datetime] = None
+    review_status: Optional[ReviewStatus] = ReviewStatus.NOT_REVIEWED
+    reviewed_by: Optional[str] = None
+    reviewed_date: Optional[datetime] = None    
     rejection_reason: Optional[str] = None
 
     # ========== Errors ==========

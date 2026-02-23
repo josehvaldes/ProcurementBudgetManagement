@@ -3,6 +3,17 @@ import sys
 from pathlib import Path
 from logging.handlers import RotatingFileHandler
 from typing import Optional
+import json
+
+class ExtraFieldFormatter(logging.Formatter):
+    def format(self, record):
+        base = super().format(record)
+        # Collect extra fields not part of standard LogRecord
+        standard_keys = set(logging.LogRecord('', 0, '', 0, '', (), None).__dict__.keys())
+        extra = {k: v for k, v in record.__dict__.items() if k not in standard_keys and k not in ('message', 'asctime')}
+        if extra:
+            base += f" | extra: {json.dumps(extra, default=str)}"
+        return base
 
 def setup_logging(
     log_level: str = "INFO",
@@ -26,7 +37,7 @@ def setup_logging(
         )
     
     # Create formatter
-    formatter = logging.Formatter(log_format)
+    formatter = ExtraFieldFormatter(log_format) #logging.Formatter(log_format)
     
     # Get root logger
     root_logger = logging.getLogger()

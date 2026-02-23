@@ -356,15 +356,15 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
   - Implement escalation workflows
   - Add manual review queue handling
   - Publish message with subject='invoice.approved' or 'invoice.manual_review'
-- Create approval notification system
+- ✅ Create approval notification system
   - Email notifications to approvers
-  - **Generate SAS URLs for invoice file viewing** ⭐
-  - Webhook notifications (optional)
-- Build approval dashboard/API for stakeholders
+- ✅ Build approval dashboard/API for stakeholders
   - GET /approvals/pending (manual review queue)
   - POST /approvals/{invoice_id}/approve
   - POST /approvals/{invoice_id}/reject
-  - **GET /invoices/{id}/file (returns SAS URL)** ⭐
+  
+
+
 - Set up Payment Agent Service Bus subscription
   - Create receiver for payment-agent-subscription
 - Implement Payment Agent with LangChain
@@ -383,3 +383,4 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
   - End-to-end invoice processing
   - Error handling scenarios
   - State recovery scenarios
+

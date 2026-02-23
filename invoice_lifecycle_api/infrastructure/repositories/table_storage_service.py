@@ -376,7 +376,7 @@ class TableStorageService(TableServiceInterface):
                     index += 1
                 parameters[param_name] = value
             
-            name_filter = f" {join_operator.value} ".join(
+            name_filter = f"{join_operator.value}".join(
                 [f"{filter_name} {comparer} @{param_name}"
                  for (filter_name, value, comparer), param_name in zip(filters, parameters)]
             )
@@ -391,7 +391,7 @@ class TableStorageService(TableServiceInterface):
                     "correlation_id": correlation_id
                 }
             )
-
+            print(f"Debug - filter query: {name_filter}, parameters: {parameters}")
             entities = self.table_client.query_entities(
                 query_filter=name_filter,
                 parameters=parameters

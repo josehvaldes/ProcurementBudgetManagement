@@ -2,8 +2,11 @@
 Payment Agent - Schedules and manages invoice payments.
 """
 
+import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+
+from langsmith import traceable
 from agents.base_agent import BaseAgent
 from shared.utils.constants import InvoiceSubjects, SubscriptionNames
 
@@ -20,13 +23,19 @@ class PaymentAgent(BaseAgent):
     - Publish invoice.payment_scheduled message
     """
     
-    def __init__(self):
-        super().__init__(
+    def __init__(self, shutdown_event: asyncio.Event = asyncio.Event()):
+        super().__init__( 
             agent_name="PaymentAgent",
-            subscription_name=SubscriptionNames.PAYMENT_AGENT
+            subscription_name=SubscriptionNames.PAYMENT_AGENT,
+            shutdown_event=shutdown_event
         )
     
-    def process_invoice(self, invoice_id: str, message_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def release_resources(self) -> None:
+        """Release any resources held by the agent."""
+        cleanup_errors = []
+
+    @traceable(name="payment_agent.process_invoice", tags=["payment", "agent"], metadata={"version": "1.0"})
+    async def process_invoice(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Schedule payment for approved invoice.
         
@@ -37,7 +46,19 @@ class PaymentAgent(BaseAgent):
         Returns:
             Result data for next state
         """
-        self.logger.info(f"Scheduling payment for invoice {invoice_id}")
+        invoice_id = message_data["invoice_id"]
+        department_id = message_data["department_id"]
+        correlation_id = message_data.get("correlation_id", invoice_id)
+        
+        self.logger.info(
+            f"Starting payment scheduling for invoice",
+            extra={
+                "invoice_id": invoice_id,
+                "department_id": department_id,
+                "correlation_id": correlation_id,
+                "agent": self.agent_name
+            }
+        )
         
         # Get invoice from storage
         invoice = self.get_invoice(invoice_id)
@@ -80,5 +101,5 @@ class PaymentAgent(BaseAgent):
 
 if __name__ == "__main__":
     agent = PaymentAgent()
-    agent.initialize()
-    agent.run()
+    agent.setup_signal_handlers()
+    asyncio.run(agent.run())

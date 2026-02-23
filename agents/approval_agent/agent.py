@@ -8,12 +8,13 @@ from typing import Dict, Any, Optional
 
 from langsmith import traceable
 from agents.approval_agent.tools.approval_analytics_agent import ApprovalAnalyticsAgent, ApprovalAnalyticsOutcome
+from agents.approval_agent.tools.approval_notification_system import ApprovalNotificationSystem
 from agents.approval_agent.tools.approval_status import ApprovalDecision, ApprovalStatus
 from shared.config.settings import settings
 from agents.base_agent import BaseAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.budget import BudgetStatus
-from shared.models.invoice import InvoiceState
+from shared.models.invoice import InvoiceState, ReviewStatus
 from shared.utils.constants import CompoundKeyStructure, InvoiceSubjects, SubscriptionNames
 from shared.utils.exceptions import BudgetNotFoundException, DocumentExtractionException, InvoiceApprovalException, InvoiceNotFoundException, StorageException, VendorNotFoundException
 
@@ -38,7 +39,7 @@ class ApprovalAgent(BaseAgent):
 
         self.vendor_table_client:Optional[TableStorageService] = None
         self.budget_table_client:Optional[TableStorageService] = None
-
+        self.alert_notification_system: Optional[ApprovalNotificationSystem] = None
         try:
             self.vendor_table_client = TableStorageService(
                 storage_account_url=settings.table_storage_account_url,
@@ -48,6 +49,7 @@ class ApprovalAgent(BaseAgent):
                 storage_account_url=settings.table_storage_account_url,
                 table_name=settings.budgets_table_name
             )
+            self.alert_notification_system = ApprovalNotificationSystem()
             self.logger.info("Successfully initialized ApprovalAgent",
                              extra={
                                  "agent": self.agent_name,
@@ -143,7 +145,7 @@ class ApprovalAgent(BaseAgent):
                                                                                  correlation_id)
             tasks = []
             if deterministic_decision.status == ApprovalStatus.REJECTED:
-                task = self._fail_invoice(invoice_data, InvoiceState.FAILED, deterministic_decision.reason)
+                task = self._reject_invoice(invoice_data, InvoiceState.FAILED, deterministic_decision.reason)
                 tasks.append(task)
             elif deterministic_decision.status == ApprovalStatus.MANUAL_APPROVAL_REQUIRED:
                 task = self._handle_manual_review(invoice_data, vendor_data, budget_data, correlation_id, deterministic_decision.reason)
@@ -299,7 +301,7 @@ class ApprovalAgent(BaseAgent):
                         "correlation_id": correlation_id
                     }
                 )
-                await self._approve_invoice(invoice_data, approval_method="ai_warning")
+                await self._approve_invoice(invoice_data, decision, approval_method="ai_warning")
             elif decision.status == ApprovalStatus.AI_ALERT:
                 invoice_data["errors"] = invoice_data.get("errors", []) + [decision.reason]
                 invoice_data["state"] = InvoiceState.MANUAL_REVIEW.value
@@ -316,7 +318,9 @@ class ApprovalAgent(BaseAgent):
                     }
                 )
             elif decision.status == ApprovalStatus.AI_PASSED:
-                await self._approve_invoice(invoice_data, approval_method="ai_passed")
+                await self._approve_invoice(invoice_data, 
+                                             vendor_data, budget_data,
+                                             decision, approval_method="ai_passed")
                 self.logger.info(
                     "Invoice approved by AI decision",
                     extra={
@@ -400,12 +404,16 @@ class ApprovalAgent(BaseAgent):
             )
 
 
-    async def _fail_invoice(self, invoice_data: Dict[str, Any], state: InvoiceState, reason: str) -> None:
+    async def _reject_invoice(self, invoice_data: Dict[str, Any], state: InvoiceState, reason: str) -> None:
         """Update invoice state to FAILED and save to storage."""
         try:
             invoice_data["state"] = state.value
             invoice_data["rejection_reason"] = reason
-            
+            invoice_data["review_status"] = ReviewStatus.REJECTED
+            invoice_data["review_date"] = datetime.now(timezone.utc).isoformat()
+            invoice_data["reviewed_by"] = "system"
+
+
             await self.update_invoice(invoice_data)
             self.logger.info(
                 "Invoice Failed/Rejected",
@@ -422,16 +430,29 @@ class ApprovalAgent(BaseAgent):
 
     async def _approve_invoice(self, 
                                invoice_data: Dict[str, Any],
+                               vendor_data: Dict[str, Any],
+                               budget_data: Dict[str, Any],
+                               decision: ApprovalDecision,
                                approval_method: str = "auto"
                                ) -> None:
         """Update invoice state to APPROVED and save to storage."""
         try:
 
             invoice_data["state"] = InvoiceState.APPROVED.value
-            invoice_data["approved_by"] = approval_method
-            invoice_data["approved_date"] = datetime.now(timezone.utc).isoformat()
+            invoice_data["reviewed_by"] = approval_method
+            invoice_data["reviewed_date"] = datetime.now(timezone.utc).isoformat()
+            invoice_data["review_status"] = ReviewStatus.APPROVED
 
             await self.update_invoice(invoice_data)
+
+            if self.alert_notification_system:
+                await self.alert_notification_system.send_alert(
+                    invoice=invoice_data,
+                    vendor=vendor_data,
+                    budget=budget_data,
+                    decision=decision
+                )
+
             self.logger.info(
                 "Invoice approved successfully",
                 extra={

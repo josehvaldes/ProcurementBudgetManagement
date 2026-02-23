@@ -1,5 +1,6 @@
 """Dependency Injection Container."""
 from invoice_lifecycle_api.application.interfaces.service_interfaces import MessagingServiceInterface, StorageServiceInterface, TableServiceInterface
+from invoice_lifecycle_api.application.services.approval_service import ApprovalService
 from invoice_lifecycle_api.application.services.budget_service import BudgetService
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import AzureCredentialManager, get_credential_manager
 from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
@@ -96,3 +97,12 @@ def get_budget_service():
     """Dependency injection function for budget manager service."""
     table_repository = get_budget_repository_service()
     return BudgetService(table_repository)
+
+def get_approval_service():
+    """Dependency injection function for approval service."""
+    invoice_repository = get_invoice_repository_service()
+    budget_repository = get_budget_repository_service()
+    return ApprovalService(
+        invoice_repository=invoice_repository,
+        budget_repository=budget_repository
+    )

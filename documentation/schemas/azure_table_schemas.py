@@ -110,8 +110,8 @@ INVOICES_SCHEMA = {
     # ========== VALIDATION & APPROVAL ==========
     "validation_passed": "bool",       # Overall validation result
     "approval_required": "bool",       # Whether manual approval needed
-    "approved_by": "Optional[str]",    # User who approved (if manual)
-    "approved_date": "Optional[datetime]", # Approval timestamp
+    "reviewed_by": "Optional[str]",    # User who approved (if manual)
+    "reviewed_date": "Optional[datetime]", # Approval timestamp
     "rejection_reason": "Optional[str]", # Why invoice was rejected
     
     # ========== METADATA & TRACKING ==========
@@ -204,8 +204,8 @@ VENDORS_SCHEMA = {
     
     # ========== APPROVAL & STATUS ==========
     "approved": "bool",                # Whether vendor is approved
-    "approved_by": "Optional[str]",    # Who approved vendor
-    "approved_date": "Optional[datetime]", # When approved
+    "reviewed_by": "Optional[str]",    # Who approved vendor
+    "reviewed_date": "Optional[datetime]", # When approved
     "active": "bool",                  # Whether vendor is active
     "suspended": "bool",               # Whether vendor is suspended
     "suspension_reason": "Optional[str]", # Why vendor suspended
@@ -261,8 +261,8 @@ VENDOR_EXAMPLE = {
     "contact_phone": "+1-555-0123",
     "address": '{"street": "123 Tech Lane", "city": "San Francisco", "state": "CA", "zip": "94105"}',
     "approved": True,
-    "approved_by": "john.doe@company.com",
-    "approved_date": "2024-01-15T00:00:00Z",
+    "reviewed_by": "john.doe@company.com",
+    "reviewed_date": "2024-01-15T00:00:00Z",
     "active": True,
     "suspended": False,
     "payment_terms": "net-30",
