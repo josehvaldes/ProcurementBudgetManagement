@@ -72,7 +72,7 @@ class Vendor:
     suspension_reason: Optional[str] = None
     
     # ========== PAYMENT TERMS ==========
-    payment_terms: str = "NET-30"  # net-30, net-60, etc.
+    payment_terms: str = "NET_30"  # NET_30, NET_60, etc.
     payment_method: Optional[str] = None  # Preferred payment method
     bank_account: Optional[BankAccount] = None  # Encrypted in storage
     currency: str = "USD"

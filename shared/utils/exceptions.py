@@ -132,3 +132,13 @@ class VendorNotFoundException(ProcurementException):
 class FileLoadException(Exception):
     """Raised when loading a file (e.g., approval policy) fails."""
     pass
+
+
+#payment agent exceptions
+class PaymentSchedulingException(ProcurementException):
+    """Raised when scheduling payment for an invoice fails."""
+    pass
+
+class PaymentProcessingException(ProcurementException):
+    """Raised when processing payment for an invoice fails."""
+    pass

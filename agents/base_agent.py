@@ -506,7 +506,23 @@ class BaseAgent(ABC):
                     state=invoice_state,
                     requires_manual_review=True
                 )
-                
+            elif invoice_state == InvoiceState.PAYMENT_SCHEDULED.value:
+                # Payment scheduled - terminal state for this agent
+                self.logger.info(
+                    f"Invoice payment scheduled - processing complete",
+                    extra={
+                        "agent_name": self.agent_name,
+                        "invoice_id": invoice_id,
+                        "state": invoice_state,
+                        "correlation_id": correlation_id
+                    }
+                )
+                return MessageProcessingResult(
+                    success=True,
+                    invoice_id=invoice_id,
+                    state=invoice_state
+                )
+
             elif invoice_state == InvoiceState.FAILED.value:
                 # Processing failed - mark as unsuccessful
                 self.logger.warning(

@@ -129,6 +129,8 @@ class Invoice:
     reviewed_by: Optional[str] = None
     reviewed_date: Optional[datetime] = None    
     rejection_reason: Optional[str] = None
+    payment_terms: str = "NET_30"  # NET_30, NET_60, etc.
+    due_date: str = None  # Calculated from invoice date + payment terms
 
     # ========== Errors ==========
     errors: List[InvoiceInternalMessage] = field(default_factory=list)
@@ -150,7 +152,8 @@ class Invoice:
             InvoiceState.CREATED: [InvoiceState.EXTRACTED, InvoiceState.FAILED],
             InvoiceState.EXTRACTED: [InvoiceState.VALIDATED, InvoiceState.FAILED],
             InvoiceState.VALIDATED: [InvoiceState.BUDGET_CHECKED, InvoiceState.FAILED],
-            InvoiceState.BUDGET_CHECKED: [InvoiceState.APPROVED, InvoiceState.MANUAL_REVIEW, InvoiceState.FAILED],
+            InvoiceState.BUDGET_CHECKED: [InvoiceState.APPROVED, InvoiceState.PENDING_APPROVAL, InvoiceState.MANUAL_REVIEW, InvoiceState.FAILED],
+            InvoiceState.PENDING_APPROVAL: [InvoiceState.APPROVED, InvoiceState.REJECTED, InvoiceState.FAILED],
             InvoiceState.APPROVED: [InvoiceState.PAYMENT_SCHEDULED, InvoiceState.FAILED],
             InvoiceState.PAYMENT_SCHEDULED: [InvoiceState.PAID, InvoiceState.FAILED],
             InvoiceState.MANUAL_REVIEW: list(InvoiceState),  # Can go to any state after review

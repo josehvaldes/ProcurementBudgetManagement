@@ -3,15 +3,15 @@ Approval Agent - Manages invoice approval workflow.
 """
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 from langsmith import traceable
+from shared.config.settings import settings
+from agents.base_agent import BaseAgent
 from agents.approval_agent.tools.approval_analytics_agent import ApprovalAnalyticsAgent, ApprovalAnalyticsOutcome
 from agents.approval_agent.tools.approval_notification_system import ApprovalNotificationSystem
 from agents.approval_agent.tools.approval_status import ApprovalDecision, ApprovalStatus
-from shared.config.settings import settings
-from agents.base_agent import BaseAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.budget import BudgetStatus
 from shared.models.invoice import InvoiceState, ReviewStatus
@@ -160,6 +160,7 @@ class ApprovalAgent(BaseAgent):
                 "invoice_id": invoice_id,
                 "department_id": department_id,
                 "event_type": "ApprovalAgentCompleted",
+                "state": invoice_data["state"],
                 "approval_method": invoice_data["approval_method"],
                 "correlation_id": correlation_id,
             }
@@ -442,6 +443,14 @@ class ApprovalAgent(BaseAgent):
             invoice_data["reviewed_by"] = approval_method
             invoice_data["reviewed_date"] = datetime.now(timezone.utc).isoformat()
             invoice_data["review_status"] = ReviewStatus.APPROVED
+            invoice_data["approved_payment_terms"] = vendor_data.get("payment_terms", None)
+
+            if invoice_data["approved_payment_terms"] == "NET_30":
+                due_days = 30
+            elif invoice_data["approved_payment_terms"] == "NET_60":
+                due_days = 60
+
+            invoice_data["due_date"] = datetime.now(timezone.utc) + timedelta(days=due_days)
 
             await self.update_invoice(invoice_data)
 
