@@ -371,14 +371,85 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
   - Implement vendor remittance notifications
   - Publish message with subject='invoice.payment_scheduled'
 
-- **Complete run_agents.py script**
+- ✅**Complete run_agents.py script**
   - Start all 5 agents in separate processes
   - Graceful shutdown handling
   - Health check per agent
-- Implement state transitions: APPROVED → PAYMENT_SCHEDULED → PAID
-- Test complete pipeline from intake to payment **all running locally**
-- Add comprehensive integration tests
+- ✅Implement state transitions: APPROVED → PAYMENT_SCHEDULED → PAID
+- ✅Test complete pipeline from intake to payment **all running locally**
+- ✅Add comprehensive integration tests
   - End-to-end invoice processing
   - Error handling scenarios
   - State recovery scenarios
 
+### Success Criteria
+- ✅ Invoices auto-approved based on policy rules
+- ✅ Manual approvals routed correctly
+- ✅ Payments scheduled according to terms
+- ✅ Full pipeline processes invoices end-to-end
+- ✅ All 5 agents run concurrently via run_agents.py
+- ✅ System handles 100+ invoices in test run
+- ✅ All agents running locally, no deployment required yet
+- ✅ **Blob Storage performance meets targets (< 2s uploads/downloads)** ⭐
+
+---
+
+## Week 5: Analytics & Reporting
+**Goal:** Build intelligence layer for insights, trends, and cost optimization
+
+### Key Deliverables
+- Analytics Agent with trend detection **running locally**
+- Spending pattern analysis (YoY, MoM comparisons)
+- Anomaly detection algorithms
+- Cost-saving recommendation engine
+- Executive dashboard with key metrics
+- Reporting API endpoints
+
+### Tasks
+- Set up Analytics Agent Service Bus subscription
+  - Create receiver for analytics-agent-subscription (no filter - all messages)
+- Implement Analytics Agent with LangChain
+  - Build spending trend analysis
+  - Create YoY and MoM comparison logic
+  - Implement anomaly detection algorithms (Z-score, IQR)
+  - Build cost-saving recommendation engine
+  - Add budget burn rate forecasting
+  - Store analytics results in separate table
+- Design analytics data aggregation strategy
+  - Pre-aggregate data by department/month
+  - Calculate running totals
+  - Store in AnalyticsResults table
+- Create executive dashboard API endpoints
+  - GET /analytics/spending-trends
+  - GET /analytics/budget-health
+  - GET /analytics/vendor-analysis
+  - GET /analytics/anomalies
+  - GET /analytics/recommendations
+  - **GET /analytics/storage-costs (blob storage usage)** ⭐
+- Build custom report generation
+  - PDF report generation
+  - Excel export functionality
+- Implement analytics event processing (parallel to main flow)
+  - Analytics doesn't block invoice processing
+  - Processes all invoice events for insights
+- Create scheduled analytics jobs (daily/weekly reports)
+  - Azure Function or scheduled script
+- Implement insights notification system
+  - Weekly summary emails
+  - Slack/Teams alerts for anomalies
+- **Monitor Blob Storage costs and usage** ⭐
+  - Track storage consumption by department
+  - Identify cost optimization opportunities
+  - Report on lifecycle policy effectiveness
+
+### Success Criteria
+- ✅ Analytics Agent processes all invoice events
+- ✅ Spending trends identified and reported
+- ✅ Anomalies detected and flagged
+- ✅ Cost-saving insights generated weekly
+- ✅ Dashboard API provides real-time metrics
+- ✅ Reports generate correctly (PDF/Excel)
+- ✅ All 6 agents run concurrently locally
+- ✅ **Blob Storage cost tracking dashboard available** ⭐
+
+---
