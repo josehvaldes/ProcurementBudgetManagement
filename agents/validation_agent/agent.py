@@ -70,7 +70,7 @@ class ValidationAgent(BaseAgent):
             # Initialize validation tools
             self.deterministic_validation_tool = DeterministicValidator(
                 vendor_table=self.vendor_table_client,
-                invoice_table=self.invoice_table_client
+                invoice_table=self.invoice_table
             )
 
             self.ai_validator = AgenticValidator()
@@ -524,7 +524,11 @@ class ValidationAgent(BaseAgent):
                 )
                 
                 # Execute AI validation with vendor context
+                
                 vendor_data = deterministic_result.matched_vendor.to_dict() if deterministic_result.matched_vendor else {}
+                # update vendor_id from deterministic validation if available
+                invoice_obj.vendor_id = vendor_data.get("vendor_id", None)
+                
                 ai_response = await self._execute_ai_validation(
                     invoice_obj=invoice_obj,
                     vendor_data=vendor_data,
@@ -541,6 +545,7 @@ class ValidationAgent(BaseAgent):
                             "correlation_id": correlation_id
                         }
                     )
+                    
                     invoice_obj.state = InvoiceState.VALIDATED
                     invoice_obj.validation_passed = True
                 else:

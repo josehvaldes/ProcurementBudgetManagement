@@ -80,33 +80,6 @@ class PaymentAgent(BaseAgent):
         """Schedule background jobs."""
         schedule.every(1).hour.do(lambda: asyncio.create_task(self.payment_task()))
 
-    async def _retrieve_vendor_metadata(self, vendor_id: str, correlation_id: str) -> Dict[str, Any]:
-        """Retrieve vendor metadata from storage."""
-        try:
-            vendor = await self.vendor_table_client.get_entity(
-                partition_key="VENDOR", # partition key is fixed for vendors
-                row_key=vendor_id
-            )
-            if not vendor:
-                raise VendorNotFoundException(f"Vendor {vendor_id} not found")
-
-            self.logger.debug(
-                "Vendor metadata retrieved successfully",
-                extra={
-                    "vendor_id": vendor_id,
-                    "correlation_id": correlation_id
-                }
-            )
-
-            return vendor
-        except VendorNotFoundException:
-            raise
-        except Exception as e:
-            raise StorageException(
-                f"Failed to retrieve vendor metadata: {str(e)}"
-            ) from e
-
-
     async def payment_task(self):
         """Background job to process payments."""
         now = datetime.now(timezone.utc)
@@ -144,7 +117,7 @@ class PaymentAgent(BaseAgent):
             # cross-partition query to get all invoices in the specified state
             filters = [("state", InvoiceState.PENDING_APPROVAL.value, CompareOperator.EQUAL.value)]
 
-            invoices = self.invoice_table_client.query_entities_with_filters(
+            invoices = self.invoice_table.query_entities_with_filters(
                 filters=filters
             )
 
@@ -196,7 +169,7 @@ class PaymentAgent(BaseAgent):
         try:
             # Get invoice from storage
             invoice_data = await self.get_invoice(department_id, invoice_id)
-            vendor_data = await self._retrieve_vendor_metadata(invoice_data["vendor_id"], correlation_id)
+            vendor_data = await self.retrieve_vendor_metadata(invoice_data["vendor_id"], correlation_id)
             
             completed = await self._process_invoice_payment(invoice_data, vendor_data)
             

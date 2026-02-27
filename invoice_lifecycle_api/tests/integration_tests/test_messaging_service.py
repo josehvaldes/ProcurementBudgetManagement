@@ -84,7 +84,7 @@ class TestMessagingService:
 
     async def test_single_receive_message(self):
         try:
-            subscription_name = SubscriptionNames.INTAKE_AGENT
+            subscription_name = SubscriptionNames.ANALYTICS_AGENT
             print(f"Getting subscription receiver for topic 'invoice-events' and subscription '{subscription_name}'")
             
             receiver: SubscriptionReceiverWrapper

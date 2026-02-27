@@ -60,7 +60,7 @@ class TestValidationAgent:
         )
 
     @pytest.mark.asyncio
-    async def test_validate_invoice_valid(self, validator, invoice, vendor):
+    async def test_validate_invoice_valid(self, validator: DeterministicValidator, invoice, vendor):
         """Test validation of a valid invoice with matching vendor."""
         # Arrange
         invoice.vendor_name = vendor.name  # Ensure vendor name matches

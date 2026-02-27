@@ -73,23 +73,6 @@ class ApprovalAgent(BaseAgent):
     async def release_resources(self) -> None:
         """Release any resources held by the agent."""
         cleanup_errors = []
-        if self.vendor_table_client:
-            try:
-                await self.vendor_table_client.close()
-                self.logger.info("Vendor table client closed successfully", extra={"agent": self.agent_name})
-            except Exception as e:
-                error_msg = f"Failed to close vendor table client: {str(e)}"
-                self.logger.error(error_msg, exc_info=True)
-                cleanup_errors.append(error_msg)
-
-        if self.budget_table_client:
-            try:
-                await self.budget_table_client.close()
-                self.logger.info("Budget table client closed successfully", extra={"agent": self.agent_name})
-            except Exception as e:
-                error_msg = f"Failed to close budget table client: {str(e)}"
-                self.logger.error(error_msg, exc_info=True)
-                cleanup_errors.append(error_msg)
 
         if cleanup_errors:
             self.logger.warning(
@@ -135,9 +118,9 @@ class ApprovalAgent(BaseAgent):
             
             vendor_id = invoice_data.get("vendor_id", None)
 
-            vendor_data = await self._retrieve_vendor_metadata(vendor_id, correlation_id)
+            vendor_data = await self.retrieve_vendor_metadata(vendor_id, correlation_id)
 
-            budget_data = await self._retrieve_budget_metadata(invoice_data, correlation_id)
+            budget_data = await self.retrieve_budget_metadata(invoice_data, correlation_id)
             
             deterministic_decision = await self._deterministic_approval_decision(invoice_data,
                                                                                  vendor_data,
@@ -503,68 +486,6 @@ class ApprovalAgent(BaseAgent):
             raise StorageException(
                 f"Failed to retrieve invoice metadata: {str(e)}"
             ) from e
-
-    async def _retrieve_vendor_metadata(self, vendor_id: str, correlation_id: str) -> Dict[str, Any]:
-        """Retrieve vendor metadata from storage."""
-        try:
-            vendor = await self.vendor_table_client.get_entity(
-                partition_key="VENDOR", # partition key is fixed for vendors
-                row_key=vendor_id
-            )
-            if not vendor:
-                raise VendorNotFoundException(f"Vendor {vendor_id} not found")
-
-            self.logger.debug(
-                "Vendor metadata retrieved successfully",
-                extra={
-                    "vendor_id": vendor_id,
-                    "correlation_id": correlation_id
-                }
-            )
-
-            return vendor
-        except VendorNotFoundException:
-            raise
-        except Exception as e:
-            raise StorageException(
-                f"Failed to retrieve vendor metadata: {str(e)}"
-            ) from e
-        
-    async def _retrieve_budget_metadata(self, invoice_data: Dict[str, Any], correlation_id: str) -> Dict[str, Any]:
-        """Retrieve budget metadata from storage."""        
-        # Placeholder for budget retrieval logic
-        # This would typically involve querying the budget table based on department_id, project_id, and category
-        department_id = invoice_data.get("department_id")
-        project_id = invoice_data.get("project_id")
-        category = invoice_data.get("category")
-        fiscal_year = invoice_data.get("fiscal_year")
-        lower = CompoundKeyStructure.LOWER_BOUND.value
-        compound_key = f"{department_id}{lower}{project_id}{lower}{category}"
-        
-        try:
-            budget = self.budget_table_client.get_entity(
-                partition_key=fiscal_year, # Partition key is fiscal year
-                row_key=compound_key
-            )
-            if not budget:
-                raise BudgetNotFoundException(f"Budget not found for department: {department_id}, project: {project_id}, category: {category}, fiscal_year: {fiscal_year}")
-
-            self.logger.debug(
-                "Budget metadata retrieved successfully",
-                extra={
-                    "department_id": department_id,
-                    "project_id": project_id,
-                    "category": category,
-                    "fiscal_year": fiscal_year,
-                    "correlation_id": correlation_id
-                }
-            )
-            return budget
-        
-        except BudgetNotFoundException:
-            raise
-        except Exception as e:
-            raise StorageException(f"Failed to retrieve budget metadata: {str(e)}") from e
 
     async def _deterministic_approval_decision(self, 
                                                invoice_data: Dict[str, Any], 

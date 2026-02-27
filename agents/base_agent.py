@@ -32,12 +32,15 @@ from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_cr
 from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.invoice import InvoiceInternalMessage, InvoiceState
+from shared.utils.constants import CompoundKeyStructure
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.config.settings import settings
 from shared.utils.exceptions import (
+    BudgetNotFoundException,
     InvoiceNotFoundException,
     StorageException,
-    MessagingException
+    MessagingException,
+    VendorNotFoundException
 )
 
 # Configure logging
@@ -103,8 +106,10 @@ class BaseAgent(ABC):
         
         # Azure service clients (initialized in initialize_clients)
         self.service_bus_client: Optional[ServiceBusMessagingService] = None
-        self.invoice_table_client: Optional[TableStorageService] = None
-        
+        self.invoice_table: Optional[TableStorageService] = None
+        self.vendor_table: Optional[TableStorageService] = None
+        self.budget_table: Optional[TableStorageService] = None
+
         # Initialize infrastructure
         self._initialize_clients()
         
@@ -140,12 +145,24 @@ class BaseAgent(ABC):
         
         try:
             # Initialize Table Storage client for invoice persistence
-            self.invoice_table_client = TableStorageService(
+            self.invoice_table = TableStorageService(
                 storage_account_url=settings.table_storage_account_url,
                 table_name=settings.invoices_table_name
             )
             self.logger.debug("Table Storage client initialized successfully")
             
+            self.vendor_table = TableStorageService(
+                storage_account_url=settings.table_storage_account_url,
+                table_name=settings.vendors_table_name
+            )
+            self.logger.debug("Vendor Table Storage client initialized successfully")
+
+            self.budget_table = TableStorageService(
+                storage_account_url=settings.table_storage_account_url,
+                table_name=settings.budgets_table_name
+            )
+            self.logger.debug("Budget Table Storage client initialized successfully")
+
             # Initialize Service Bus client for message processing
             self.service_bus_client = ServiceBusMessagingService(
                 host_name=settings.service_bus_host_name,
@@ -419,9 +436,13 @@ class BaseAgent(ABC):
             body = json.loads(str(message))
             invoice_id = body.get("invoice_id")
             department_id = body.get("department_id")
+
             correlation_id = message.correlation_id if message.correlation_id else invoice_id
+            subject = message.subject if message.subject else None
             
-            
+            body["subject"] = subject  # Add subject to body for downstream processing
+            body["correlation_id"] = correlation_id  # Add correlation_id to body for downstream processing
+
             # Validate required fields
             if not invoice_id or not department_id:
                 raise ValueError(
@@ -679,6 +700,76 @@ class BaseAgent(ABC):
             )
             raise MessagingException(error_msg) from e
     
+    async def retrieve_vendor_metadata(self, vendor_id: str, correlation_id: str) -> Dict[str, Any]:
+        """Retrieve vendor metadata from storage."""
+        try:
+            self.logger.info(
+                "Retrieving vendor metadata",
+                extra={
+                    "vendor_id": vendor_id,
+                    "correlation_id": correlation_id
+                }
+            )
+
+            vendor = await self.vendor_table.get_entity(
+                partition_key="VENDOR", # partition key is fixed for vendors
+                row_key=vendor_id
+            )
+            if not vendor:
+                raise VendorNotFoundException(f"Vendor {vendor_id} not found")
+
+            self.logger.debug(
+                "Vendor metadata retrieved successfully",
+                extra={
+                    "vendor_id": vendor_id,
+                    "correlation_id": correlation_id
+                }
+            )
+
+            return vendor
+        except VendorNotFoundException:
+            raise
+        except Exception as e:
+            raise StorageException(
+                f"Failed to retrieve vendor metadata: {str(e)}"
+            ) from e
+
+    async def retrieve_budget_metadata(self, invoice_data: Dict[str, Any], correlation_id: str) -> Dict[str, Any]:
+        """Retrieve budget metadata from storage."""
+        # Placeholder for budget retrieval logic
+        # This would typically involve querying the budget table based on department_id, project_id, and category
+        department_id = invoice_data.get("department_id")
+        project_id = invoice_data.get("project_id")
+        category = invoice_data.get("category")
+        fiscal_year = invoice_data.get("fiscal_year")
+        lower = CompoundKeyStructure.LOWER_BOUND.value
+        compound_key = f"{department_id}{lower}{project_id}{lower}{category}"
+        
+        try:
+            budget = self.budget_table.get_entity(
+                partition_key=fiscal_year, # Partition key is fiscal year
+                row_key=compound_key
+            )
+            if not budget:
+                raise BudgetNotFoundException(f"Budget not found for department: {department_id}, project: {project_id}, category: {category}, fiscal_year: {fiscal_year}")
+
+            self.logger.debug(
+                "Budget metadata retrieved successfully",
+                extra={
+                    "department_id": department_id,
+                    "project_id": project_id,
+                    "category": category,
+                    "fiscal_year": fiscal_year,
+                    "correlation_id": correlation_id
+                }
+            )
+            return budget
+        
+        except BudgetNotFoundException:
+            raise
+        except Exception as e:
+            raise StorageException(f"Failed to retrieve budget metadata: {str(e)}") from e
+        
     async def get_invoice(
         self,
         department_id: str,
@@ -698,7 +789,7 @@ class BaseAgent(ABC):
             StorageException: If retrieval fails (other than not found)
         """
         try:
-            invoice_entity = await self.invoice_table_client.get_entity(
+            invoice_entity = await self.invoice_table.get_entity(
                 partition_key=department_id,
                 row_key=invoice_id
             )
@@ -755,7 +846,7 @@ class BaseAgent(ABC):
             )
         
         try:
-            returned_key = await self.invoice_table_client.upsert_entity(
+            returned_key = await self.invoice_table.upsert_entity(
                 entity=invoice,
                 partition_key=department_id,
                 row_key=invoice_id
@@ -841,9 +932,9 @@ class BaseAgent(ABC):
         cleanup_errors = []
         
         # Close Table Storage client
-        if self.invoice_table_client:
+        if self.invoice_table:
             try:
-                await self.invoice_table_client.close()
+                await self.invoice_table.close()
                 self.logger.debug("Invoice table client closed successfully")
             except Exception as e:
                 error_msg = f"Error closing invoice table client: {str(e)}"
@@ -860,6 +951,24 @@ class BaseAgent(ABC):
                 self.logger.warning(error_msg, exc_info=True)
                 cleanup_errors.append(error_msg)
         
+        if self.vendor_table:
+            try:
+                await self.vendor_table.close()
+                self.logger.debug("Vendor table client closed successfully")
+            except Exception as e:
+                error_msg = f"Error closing vendor table client: {str(e)}"
+                self.logger.warning(error_msg, exc_info=True)
+                cleanup_errors.append(error_msg)
+
+        if self.budget_table:
+            try:
+                await self.budget_table.close()
+                self.logger.debug("Budget table client closed successfully")
+            except Exception as e:
+                error_msg = f"Error closing budget table client: {str(e)}"
+                self.logger.warning(error_msg, exc_info=True)
+                cleanup_errors.append(error_msg)
+
         # Release agent-specific resources
         try:
             await self.release_resources()
