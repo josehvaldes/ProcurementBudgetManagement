@@ -406,49 +406,17 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
 - Reporting API endpoints
 
 ### Tasks
-- Set up Analytics Agent Service Bus subscription
+- ✅ Set up Analytics Agent Service Bus subscription
   - Create receiver for analytics-agent-subscription (no filter - all messages)
-- Implement Analytics Agent with LangChain
-  - Build spending trend analysis
-  - Create YoY and MoM comparison logic
-  - Implement anomaly detection algorithms (Z-score, IQR)
-  - Build cost-saving recommendation engine
-  - Add budget burn rate forecasting
-  - Store analytics results in separate table
-- Design analytics data aggregation strategy
-  - Pre-aggregate data by department/month
-  - Calculate running totals
-  - Store in AnalyticsResults table
+- Store analytics results in separate table
 - Create executive dashboard API endpoints
-  - GET /analytics/spending-trends
-  - GET /analytics/budget-health
-  - GET /analytics/vendor-analysis
-  - GET /analytics/anomalies
-  - GET /analytics/recommendations
+  - GET /analytics/spending-summary?fiscal_year=FY2025&department_id=IT
+  - GET /analytics/pipeline-performance?fiscal_year=FY2025
+  - GET /analytics/vendor-summary?fiscal_year=FY2025
   - **GET /analytics/storage-costs (blob storage usage)** ⭐
-- Build custom report generation
-  - PDF report generation
-  - Excel export functionality
-- Implement analytics event processing (parallel to main flow)
-  - Analytics doesn't block invoice processing
-  - Processes all invoice events for insights
-- Create scheduled analytics jobs (daily/weekly reports)
-  - Azure Function or scheduled script
-- Implement insights notification system
-  - Weekly summary emails
-  - Slack/Teams alerts for anomalies
-- **Monitor Blob Storage costs and usage** ⭐
-  - Track storage consumption by department
-  - Identify cost optimization opportunities
-  - Report on lifecycle policy effectiveness
 
 ### Success Criteria
 - ✅ Analytics Agent processes all invoice events
-- ✅ Spending trends identified and reported
-- ✅ Anomalies detected and flagged
-- ✅ Cost-saving insights generated weekly
-- ✅ Dashboard API provides real-time metrics
-- ✅ Reports generate correctly (PDF/Excel)
 - ✅ All 6 agents run concurrently locally
 - ✅ **Blob Storage cost tracking dashboard available** ⭐
 

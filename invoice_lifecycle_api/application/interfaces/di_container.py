@@ -1,5 +1,6 @@
 """Dependency Injection Container."""
 from invoice_lifecycle_api.application.interfaces.service_interfaces import MessagingServiceInterface, StorageServiceInterface, TableServiceInterface
+from invoice_lifecycle_api.application.services.analytics_service import AnalyticsService
 from invoice_lifecycle_api.application.services.approval_service import ApprovalService
 from invoice_lifecycle_api.application.services.budget_service import BudgetService
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import AzureCredentialManager, get_credential_manager
@@ -81,6 +82,12 @@ def get_budget_repository_service() -> TableServiceInterface:
                                   storage_account_url=settings.table_storage_account_url,
                                   table_name=settings.budgets_table_name)
 
+def get_analytics_repository_service() -> TableServiceInterface:
+    """Dependency injection function for analytics repository service."""
+    return _container.get_service(TableServiceInterface, 
+                                  storage_account_url=settings.table_storage_account_url,
+                                  table_name=settings.invoice_analytics_table_name)
+
 def get_invoice_storage_service():
     """Dependency injection function for invoice storage service."""
     return _container.get_service(StorageServiceInterface)
@@ -106,3 +113,8 @@ def get_approval_service():
         invoice_repository=invoice_repository,
         budget_repository=budget_repository
     )
+
+def get_analytics_service():
+    """Dependency injection function for analytics service."""
+    analytics_repository = get_analytics_repository_service()
+    return AnalyticsService(analytics_repository)

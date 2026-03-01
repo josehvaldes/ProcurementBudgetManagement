@@ -5,12 +5,12 @@ from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import AIMessage
 
 from agents.budget_agent.tools.prompts import BudgetAgentsPrompts
-from documentation.schemas.azure_table_schemas import InvoiceState
 from invoice_lifecycle_api.application.interfaces.service_interfaces import CompareOperator
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 
 from shared.config.settings import settings
+from shared.models.invoice import InvoiceState
 from shared.utils.constants import CompoundKeyStructure
 from shared.utils.logging_config import get_logger
 

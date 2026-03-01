@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from invoice_lifecycle_api.api import approvals, budget, health, intake
+from invoice_lifecycle_api.api import analytics, approvals, budget, health, intake
 from invoice_lifecycle_api.application.interfaces.di_container import close_all_services
 from shared.utils.logging_config import get_logger, setup_logging
 from shared.config.settings import settings
@@ -84,6 +84,7 @@ app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
 app.include_router(intake.router, prefix="/api/v1/intake", tags=["intake"])
 app.include_router(budget.router, prefix="/api/v1/budgets", tags=["budgets"])
 app.include_router(approvals.router, prefix="/api/v1/approvals", tags=["approvals"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 
 
 def run_production():

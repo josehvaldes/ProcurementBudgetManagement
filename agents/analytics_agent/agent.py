@@ -3,6 +3,7 @@ Analytics Agent - Analyzes spending patterns and generates insights.
 """
 
 import asyncio
+from datetime import datetime
 import json
 from typing import Dict, Any, Optional
 
@@ -11,7 +12,7 @@ from shared.config.settings import settings
 from agents.base_agent import BaseAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.utils.constants import CompoundKeyStructure, InvoiceSubjects, SubscriptionNames
-from shared.utils.exceptions import BudgetNotFoundException, InvoiceNotFoundException, StorageException, VendorNotFoundException
+from shared.utils.exceptions import BudgetNotFoundException, EntityNotFoundException, InvoiceNotFoundException, StorageException, VendorNotFoundException
 
 
 class AnalyticsAgent(BaseAgent):
@@ -60,14 +61,6 @@ class AnalyticsAgent(BaseAgent):
                         "payment_table": settings.payment_items_table_name
                     })
                 
-            self.budget_needed_states = [
-                    InvoiceSubjects.BUDGET_CHECKED,
-                    InvoiceSubjects.APPROVED,
-                    InvoiceSubjects.PAYMENT_SCHEDULED,
-                ]
-            self.vendor_needed_states = [
-                    InvoiceSubjects.VALIDATED,
-                ]
 
         except Exception as e:
             self.logger.error(
@@ -130,8 +123,10 @@ class AnalyticsAgent(BaseAgent):
         # Extract and validate message data
         invoice_id = message_data.get("invoice_id")
         department_id = message_data.get("department_id")
+        
         correlation_id = message_data.get("correlation_id", invoice_id)
         subject = message_data.get("subject", None)
+        
 
         if not invoice_id or not department_id or not subject:
             raise ValueError("invoice_id, department_id, and subject are required in message_data")
@@ -149,19 +144,37 @@ class AnalyticsAgent(BaseAgent):
         try:
             # Get invoice from storage
             invoice_data = await self.get_invoice(department_id, invoice_id)
+            now = datetime.now()
+            issued_date: datetime = invoice_data.get("issued_date", now)
+            issue_year: int = issued_date.year if isinstance(issued_date, datetime) else now.year
+            partition_key = "FY" + str(issue_year)
+
             if not invoice_data:
                 raise InvoiceNotFoundException(
                     f"Invoice not found: {invoice_id} in department: {department_id}"
                 )
 
-            analytics_data = await self.invoice_analytics_table.get_entity(
-                partition_key=department_id,
-                row_key=invoice_id
-            )
+            try:
+                self.logger.info(
+                    f"Retrieved invoice data for analytics",
+                    extra={
+                        "invoice_id": invoice_id,
+                        "department_id": department_id,
+                        "correlation_id": correlation_id,
+                        "agent": self.agent_name
+                    }
+                )
+                
+                analytics_data = await self.invoice_analytics_table.get_entity(
+                    partition_key=partition_key,
+                    row_key=invoice_id
+                )
+            except EntityNotFoundException as e:
+                self.logger.warning(f"Analytics data not found for invoice {invoice_id}, will create new entry")
+                analytics_data = None
 
             analytics_data = analytics_data or {
-                "partition_key": department_id,
-                "row_key": invoice_id,
+                "fiscal_year": partition_key,
                 "invoice_id": invoice_id,
                 "department_id": department_id,
             }
@@ -171,54 +184,46 @@ class AnalyticsAgent(BaseAgent):
             analytics_data["invoice_errors"] = json.dumps(invoice_data.get("errors", []))
             analytics_data["invoice_warnings"] = json.dumps(invoice_data.get("warnings", []))
 
+            state = invoice_data.get("state")
+            self.logger.info(f"Invoice {invoice_id} in state {state} - analytics recorded")
 
             if subject == InvoiceSubjects.CREATED:
                 await self._handle_created_event( invoice_data, analytics_data)
             elif subject == InvoiceSubjects.EXTRACTED:
                 await self._handle_extracted_event( invoice_data, analytics_data)
+            elif subject == InvoiceSubjects.APPROVED:
+                    await self._handle_approved_event( invoice_data, analytics_data)
             elif subject == InvoiceSubjects.PAID:
                 await self._handle_paid_event( invoice_data, analytics_data)
             elif subject == InvoiceSubjects.MANUAL_REVIEW:
                 await self._handle_manual_review_event( invoice_data, analytics_data)
             elif subject == InvoiceSubjects.FAILED:
                 await self._handle_failed_event( invoice_data, analytics_data)
-
-            if subject in self.budget_needed_states:
+            elif subject == InvoiceSubjects.PAYMENT_SCHEDULED:
+                await self._handle_payment_scheduled_event( invoice_data, analytics_data)
+            elif subject == InvoiceSubjects.BUDGET_CHECKED:
                 try:
                     budget_data = await self.retrieve_budget_metadata(invoice_data, correlation_id)
+                    await self._handle_budget_checked_event( invoice_data, budget_data, analytics_data)
                 except BudgetNotFoundException as e:
                     self.logger.warning(f"Failed to retrieve budget metadata for invoice {invoice_id}", exc_info=True)
                     budget_data = None
-
-                if subject == InvoiceSubjects.BUDGET_CHECKED:
-                    await self._handle_budget_checked_event( invoice_data, budget_data, analytics_data)
-                elif subject == InvoiceSubjects.APPROVED:
-                    await self._handle_approved_event( invoice_data, budget_data, analytics_data)
-                elif subject == InvoiceSubjects.PAYMENT_SCHEDULED:
-                    await self._handle_payment_scheduled_event( invoice_data, budget_data, analytics_data)
-                
-            if subject in self.vendor_needed_states:
+            elif subject == InvoiceSubjects.VALIDATED:
                 try:
                     vendor_id = invoice_data.get("vendor_id", None)
                     if not vendor_id:
                         vendor_data = await self.retrieve_vendor_metadata(vendor_id, correlation_id)
+                        await self._handle_validated_event( invoice_data, vendor_data, analytics_data)
                 except VendorNotFoundException as e:
                     self.logger.warning(f"Failed to retrieve vendor metadata for invoice {invoice_id}", exc_info=True)
                     vendor_data = None
-
-                if subject == InvoiceSubjects.VALIDATED:
-                    await self._handle_validated_event( invoice_data, vendor_data, analytics_data)
             
-            state = invoice_data.get("state")
-            self.logger.info(f"Invoice {invoice_id} in state {state} - analytics recorded")
-            
+            self.logger.info(f"Completed analytics processing for invoice {invoice_id} in state {state}")
             # Analytics agent doesn't publish next state
             return None
         except Exception as e:
-            self.logger.error(f"Error processing invoice {invoice_id}: {e}", exc_info=True)
+            self.logger.error(f"Error processing invoice {invoice_id}: {e}", exc_info=True, stack_info=True)
             raise
-
-    
 
     async def _handle_created_event(self,
                               invoice_data: dict, 
@@ -232,12 +237,16 @@ class AnalyticsAgent(BaseAgent):
         analytics_data["invoice_created_at"] = invoice_data.get("created_date", None)
         analytics_data["invoice_budget_year"] = invoice_data.get("budget_year", None)
 
-        await self.invoice_analytics_table.upsert_entity(analytics_data)
+        await self.invoice_analytics_table.upsert_entity(analytics_data,
+                                                         partition_key=analytics_data["fiscal_year"],
+                                                         row_key=analytics_data["invoice_id"])
 
     async def _handle_extracted_event(self, invoice_data: dict, analytics_data: dict) -> None:
         """Handle analytics for EXTRACTED state."""
         analytics_data["invoice_extracted_at"] = invoice_data.get("extracted_date", None)
-        await self.invoice_analytics_table.upsert_entity(analytics_data)
+        await self.invoice_analytics_table.upsert_entity(analytics_data,
+                                                         partition_key=analytics_data["fiscal_year"],
+                                                         row_key=analytics_data["invoice_id"])
 
     async def _handle_validated_event(self, invoice_data: dict, vendor_data: dict, analytics_data: dict) -> None:
         """Handle analytics for VALIDATED state."""
@@ -252,7 +261,9 @@ class AnalyticsAgent(BaseAgent):
             analytics_data["vendor_categories"] = json.dumps(vendor_data.get("categories", []))
             analytics_data["vendor_industry"] = vendor_data.get("industry", "unknown")
 
-        await self.invoice_analytics_table.upsert_entity(analytics_data)
+        await self.invoice_analytics_table.upsert_entity(analytics_data,
+                                                         partition_key=analytics_data["fiscal_year"],
+                                                         row_key=analytics_data["invoice_id"])
 
 
     async def _handle_budget_checked_event(self, invoice_data: dict, budget_data: dict, analytics_data: dict) -> None:
@@ -268,9 +279,11 @@ class AnalyticsAgent(BaseAgent):
         analytics_data["budget_consumed_at_time"] = budget_data.get("consumed_amount", None) if budget_data else None
         analytics_data["budget_category"] = budget_data.get("category", None) if budget_data else None
 
-        await self.invoice_analytics_table.upsert_entity(analytics_data)
+        await self.invoice_analytics_table.upsert_entity(analytics_data,
+                                                         partition_key=analytics_data["fiscal_year"],
+                                                         row_key=analytics_data["invoice_id"])
 
-    async def _handle_approved_event(self, invoice_data: dict, budget_data: dict, analytics_data: dict) -> None:
+    async def _handle_approved_event(self, invoice_data: dict, analytics_data: dict) -> None:
         """Handle analytics for APPROVED state."""
         analytics_data["due_date"] = invoice_data.get("due_date", None)
         analytics_data["invoice_approved_at"] = invoice_data.get("approved_date", None)
@@ -278,23 +291,31 @@ class AnalyticsAgent(BaseAgent):
         analytics_data["reviewed_date"] = invoice_data.get("reviewed_date", None)
         analytics_data["review_status"] = invoice_data.get("review_status", None)
 
-        await self.invoice_analytics_table.upsert_entity(analytics_data)
+        await self.invoice_analytics_table.upsert_entity(analytics_data,
+                                                         partition_key=analytics_data["fiscal_year"],
+                                                         row_key=analytics_data["invoice_id"])
 
-    async def _handle_payment_scheduled_event(self, invoice_data: dict, budget_data: dict, analytics_data: dict) -> None:
+    async def _handle_payment_scheduled_event(self, invoice_data: dict, analytics_data: dict) -> None:
         """Handle analytics for PAYMENT_SCHEDULED state."""
         analytics_data["invoice_ai_suggested_approver"] = invoice_data.get("ai_suggested_approver", None)
-        await self.invoice_analytics_table.upsert_entity(analytics_data)
+        await self.invoice_analytics_table.upsert_entity(analytics_data,
+                                                         partition_key=analytics_data["fiscal_year"],
+                                                         row_key=analytics_data["invoice_id"])
 
     async def _handle_paid_event(self, invoice_data: dict, analytics_data: dict) -> None:
         """Handle analytics for PAID state."""
         analytics_data["invoice_paid"] = invoice_data.get("updated_date", None)
-        await self.invoice_analytics_table.upsert_entity(analytics_data)
+        await self.invoice_analytics_table.upsert_entity(analytics_data,
+                                                         partition_key=analytics_data["fiscal_year"],
+                                                         row_key=analytics_data["invoice_id"])
 
     async def _handle_failed_event(self, invoice_data: dict, analytics_data: dict) -> None:
         """Handle analytics for FAILED state."""
         analytics_data["invoice_budget_year"] = invoice_data.get("budget_year", None)
 
-        await self.invoice_analytics_table.upsert_entity(analytics_data)
+        await self.invoice_analytics_table.upsert_entity(analytics_data,
+                                                         partition_key=analytics_data["fiscal_year"],
+                                                         row_key=analytics_data["invoice_id"])
 
     async def _handle_manual_review_event(self, invoice_data: dict, analytics_data: dict) -> None:
         """Handle analytics for MANUAL_REVIEW state."""

@@ -30,6 +30,7 @@ from azure.core.exceptions import AzureError
 
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
+from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.invoice import InvoiceInternalMessage, InvoiceState
 from shared.utils.constants import CompoundKeyStructure
@@ -321,7 +322,7 @@ class BaseAgent(ABC):
     async def _process_message_with_metrics(
         self,
         message: ServiceBusReceivedMessage,
-        receiver
+        receiver: SubscriptionReceiverWrapper
     ) -> None:
         """
         Process a message with performance metrics and error handling.
@@ -355,7 +356,7 @@ class BaseAgent(ABC):
                 await receiver.dead_letter_message(
                     message,
                     reason=processing_result.failure_reason or "ProcessingIncomplete",
-                    error_description=processing_result.failure_description or "Message processing did not complete successfully"
+                    description=processing_result.failure_description or "Message processing did not complete successfully"
                 )
                 self.logger.warning(
                     f"Message dead-lettered: {processing_result.failure_reason}",
@@ -479,7 +480,7 @@ class BaseAgent(ABC):
                     }
                 )
                 return MessageProcessingResult(
-                    success=False,
+                    success=True,
                     invoice_id=invoice_id,
                     failure_reason="NoProcessingResult",
                     failure_description="Agent processing returned None"
