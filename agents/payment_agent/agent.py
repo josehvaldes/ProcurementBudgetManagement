@@ -4,7 +4,7 @@ Payment Agent - Schedules and manages invoice payments.
 import schedule
 import asyncio
 from typing import Dict, Any, Optional
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from langsmith import traceable
 from agents.payment_agent.tools.alert_notification_tool import AlertNotificationTool
@@ -15,7 +15,7 @@ from invoice_lifecycle_api.infrastructure.repositories.table_storage_service imp
 from shared.models.invoice import InvoiceState
 from shared.models.payment_batch_item import PaymentBatchItem, PaymentState
 from shared.utils.constants import InvoiceSubjects, SubscriptionNames
-from shared.utils.exceptions import PaymentProcessingException, StorageException, VendorNotFoundException
+from shared.utils.exceptions import PaymentProcessingException
 
 
 class PaymentAgent(BaseAgent):
@@ -157,7 +157,7 @@ class PaymentAgent(BaseAgent):
         correlation_id = message_data.get("correlation_id", invoice_id)
         
         self.logger.info(
-            f"Starting payment scheduling for invoice",
+            "Starting payment scheduling for invoice",
             extra={
                 "invoice_id": invoice_id,
                 "department_id": department_id,
@@ -175,7 +175,7 @@ class PaymentAgent(BaseAgent):
             
             if completed:
                 self.logger.info(
-                    f"Completed payment scheduling for invoice",
+                    "Completed payment scheduling for invoice",
                     extra={
                         "invoice_id": invoice_id,
                         "department_id": department_id,
@@ -194,7 +194,7 @@ class PaymentAgent(BaseAgent):
             }
         except Exception as e:
             self.logger.error(
-                f"Error in payment scheduling for invoice",
+                "Error in payment scheduling for invoice",
                 extra={
                     "invoice_id": invoice_id,
                     "department_id": department_id,

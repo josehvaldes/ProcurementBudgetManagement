@@ -95,7 +95,7 @@ class TestPaymentAgent:
         logger.info(f"Inserted payment item for invoice {payment_item.invoice_id}, waiting for processing...")
         await asyncio.sleep(3)
         await tool.payment_task()
-        logger.info(f"Payment task executed, checking payment item state...")
+        logger.info("Payment task executed, checking payment item state...")
         await asyncio.sleep(3)
         entity = await payment_tool.get_entity(
             partition_key=payment_item.department_id, 

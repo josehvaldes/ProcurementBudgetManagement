@@ -1,4 +1,3 @@
-from typing import Any
 
 import json
 from pydantic import BaseModel, Field
@@ -59,7 +58,7 @@ class ApprovalAnalyticsAgent:
                 raise ValueError(" ; ".join(errors))
 
             approval_policy = get_static_approval_policy()
-            if approval_policy == None:
+            if approval_policy is None:
                 logger.error("Approval policy is empty or not found.")
                 raise FileLoadException("Approval policy is empty or not found.")
 

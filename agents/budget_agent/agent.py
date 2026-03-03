@@ -23,7 +23,7 @@ from agents.budget_agent.tools.budget_analytics_agent import BudgetAnalyticsAgen
 from agents.budget_agent.tools.budget_classification_agent import BudgetClassificationAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.config.settings import settings
-from shared.models.invoice import Invoice, InvoiceInternalMessage, InvoiceState
+from shared.models.invoice import InvoiceInternalMessage, InvoiceState
 from shared.utils.constants import CompoundKeyStructure, InvoiceSubjects, SubscriptionNames
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
@@ -200,7 +200,7 @@ class BudgetAgent(BaseAgent):
             raise ValueError("invoice_id and department_id are required in message_data")
         
         self.logger.info(
-            f"Starting budget validation workflow",
+            "Starting budget validation workflow",
             extra={
                 "invoice_id": invoice_id,
                 "department_id": department_id,
@@ -265,7 +265,7 @@ class BudgetAgent(BaseAgent):
             )
             
             self.logger.info(
-                f"Budget validation completed successfully",
+                "Budget validation completed successfully",
                 extra={
                     "invoice_id": invoice_id,
                     "department_id": department_id,
@@ -285,7 +285,7 @@ class BudgetAgent(BaseAgent):
                 "correlation_id": correlation_id
             }
             
-        except InvoiceNotFoundException as e:
+        except InvoiceNotFoundException:
             self.logger.error(
                 f"Invoice not found: {invoice_id}",
                 extra={
@@ -422,7 +422,7 @@ class BudgetAgent(BaseAgent):
             BudgetException: If classification fails
         """
         self.logger.info(
-            f"Classifying invoice into budget category",
+            "Classifying invoice into budget category",
             extra={
                 "invoice_id": invoice_id,
                 "original_category": original_category,
@@ -444,7 +444,7 @@ class BudgetAgent(BaseAgent):
             classified_department = classification.get("department")
             
             self.logger.info(
-                f"Invoice classified successfully",
+                "Invoice classified successfully",
                 extra={
                     "invoice_id": invoice_id,
                     "classified_category": classified_category,
@@ -471,7 +471,7 @@ class BudgetAgent(BaseAgent):
                 invoice_data["warnings"].append(warning_message.__dict__)
                 
                 self.logger.warning(
-                    f"Invoice category reclassified",
+                    "Invoice category reclassified",
                     extra={
                         "invoice_id": invoice_id,
                         "from_category": original_category,
@@ -640,7 +640,7 @@ class BudgetAgent(BaseAgent):
             anomaly_detection = analytics_result.outcomes.get("anomaly_detection", {})
             
             self.logger.info(
-                f"Budget analysis completed",
+                "Budget analysis completed",
                 extra={
                     "invoice_id": invoice_id,
                     "budget_impact_level": budget_impact.get("budget_impact"),
@@ -755,7 +755,7 @@ class BudgetAgent(BaseAgent):
         
         if any(alert_conditions):
             self.logger.warning(
-                f"High-risk budget scenario detected - sending alert",
+                "High-risk budget scenario detected - sending alert",
                 extra={
                     "invoice_id": invoice_id,
                     "budget_impact": budget_impact_level,
@@ -793,7 +793,7 @@ class BudgetAgent(BaseAgent):
                 )
                 
                 self.logger.info(
-                    f"Budget alert sent successfully",
+                    "Budget alert sent successfully",
                     extra={
                         "invoice_id": invoice_id,
                         "approver_email": approver_email,

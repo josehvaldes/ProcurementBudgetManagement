@@ -408,12 +408,11 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
 ### Tasks
 - ✅ Set up Analytics Agent Service Bus subscription
   - Create receiver for analytics-agent-subscription (no filter - all messages)
-- Store analytics results in separate table
-- Create executive dashboard API endpoints
+- ✅ Store analytics results in separate table
+- ✅ Create executive dashboard API endpoints
   - GET /analytics/spending-summary?fiscal_year=FY2025&department_id=IT
   - GET /analytics/pipeline-performance?fiscal_year=FY2025
   - GET /analytics/vendor-summary?fiscal_year=FY2025
-  - **GET /analytics/storage-costs (blob storage usage)** ⭐
 
 ### Success Criteria
 - ✅ Analytics Agent processes all invoice events

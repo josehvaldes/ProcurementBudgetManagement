@@ -23,8 +23,7 @@ from shared.config.settings import settings
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
     DocumentExtractionException,
-    StorageException,
-    InvalidInvoiceStateException
+    StorageException
 )
 
 from langsmith import traceable
@@ -164,7 +163,7 @@ class IntakeAgent(BaseAgent):
             raise ValueError("invoice_id and department_id are required in message_data")
         
         self.logger.info(
-            f"Starting invoice extraction workflow",
+            "Starting invoice extraction workflow",
             extra={
                 "invoice_id": invoice_id,
                 "department_id": department_id,
@@ -211,29 +210,33 @@ class IntakeAgent(BaseAgent):
                 invoice_id=invoice_id,
                 correlation_id=correlation_id
             )
-            
-            self.logger.info(
-                f"Invoice extraction completed successfully",
-                extra={
+            if updated_invoice is None:
+                raise DocumentExtractionException(
+                    f"Failed to update invoice after extraction: {invoice_id}"
+                )
+            else:
+                self.logger.info(
+                    "Invoice extraction completed successfully",
+                    extra={
+                        "invoice_id": invoice_id,
+                        "department_id": department_id,
+                        "correlation_id": correlation_id,
+                        "state": InvoiceState.EXTRACTED.value,
+                        "has_qr_codes": len(qr_codes) > 0,
+                        "qr_code_count": len(qr_codes)
+                    }
+                )
+                return {
                     "invoice_id": invoice_id,
                     "department_id": department_id,
-                    "correlation_id": correlation_id,
+                    "event_type": "IntakeAgentCompleted",
                     "state": InvoiceState.EXTRACTED.value,
-                    "has_qr_codes": len(qr_codes) > 0,
-                    "qr_code_count": len(qr_codes)
+                    "extracted_at": datetime.now(timezone.utc).isoformat(),
+                    "correlation_id": correlation_id
                 }
-            )
+                
             
-            return {
-                "invoice_id": invoice_id,
-                "department_id": department_id,
-                "event_type": "IntakeAgentCompleted",
-                "state": InvoiceState.EXTRACTED.value,
-                "extracted_at": datetime.now(timezone.utc).isoformat(),
-                "correlation_id": correlation_id
-            }
-            
-        except InvoiceNotFoundException as e:
+        except InvoiceNotFoundException:
             self.logger.error(
                 f"Invoice not found: {invoice_id}",
                 extra={

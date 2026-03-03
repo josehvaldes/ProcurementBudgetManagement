@@ -317,7 +317,7 @@ class ServiceBusMessagingService(MessagingServiceInterface):
             
             if close_errors:
                 logger.warning(
-                    f"Some subscribers failed to close gracefully",
+                    "Some subscribers failed to close gracefully",
                     extra={
                         "failed_count": len(close_errors),
                         "total_subscribers": len(self.subscribers),

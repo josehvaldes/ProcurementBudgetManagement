@@ -38,7 +38,6 @@ from shared.utils.logging_config import get_logger, setup_logging
 from shared.config.settings import settings
 from shared.utils.exceptions import (
     BudgetNotFoundException,
-    InvoiceNotFoundException,
     StorageException,
     MessagingException,
     VendorNotFoundException
@@ -288,7 +287,7 @@ class BaseAgent(ABC):
                     # Check for shutdown request
                     if self.shutdown_event.is_set():
                         self.logger.info(
-                            f"Shutdown event detected, stopping message processing",
+                            "Shutdown event detected, stopping message processing",
                             extra={"agent_name": self.agent_name}
                         )
                         break
@@ -343,7 +342,7 @@ class BaseAgent(ABC):
             if processing_result.success:
                 await receiver.complete_message(message)
                 self.logger.info(
-                    f"Message completed successfully",
+                    "Message completed successfully",
                     extra={
                         "agent_name": self.agent_name,
                         "message_id": message_id,
@@ -396,7 +395,7 @@ class BaseAgent(ABC):
                 })
             
             self.logger.debug(
-                f"Message processing completed",
+                "Message processing completed",
                 extra={
                     "agent_name": self.agent_name,
                     "message_id": message_id,
@@ -456,7 +455,7 @@ class BaseAgent(ABC):
                 )
             
             self.logger.info(
-                f"Processing message for invoice",
+                "Processing message for invoice",
                 extra={
                     "agent_name": self.agent_name,
                     "message_subject": message.subject,
@@ -472,7 +471,7 @@ class BaseAgent(ABC):
             # Handle processing result
             if processing_result is None:
                 self.logger.warning(
-                    f"Agent returned None - no state transition will occur",
+                    "Agent returned None - no state transition will occur",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,
@@ -514,7 +513,7 @@ class BaseAgent(ABC):
             elif invoice_state == InvoiceState.MANUAL_REVIEW.value:
                 # Requires manual review - no automatic next step
                 self.logger.info(
-                    f"Invoice requires manual review - no automatic progression",
+                    "Invoice requires manual review - no automatic progression",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,
@@ -531,7 +530,7 @@ class BaseAgent(ABC):
             elif invoice_state == InvoiceState.PAYMENT_SCHEDULED.value:
                 # Payment scheduled - terminal state for this agent
                 self.logger.info(
-                    f"Invoice payment scheduled - processing complete",
+                    "Invoice payment scheduled - processing complete",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,
@@ -548,7 +547,7 @@ class BaseAgent(ABC):
             elif invoice_state == InvoiceState.FAILED.value:
                 # Processing failed - mark as unsuccessful
                 self.logger.warning(
-                    f"Invoice processing failed",
+                    "Invoice processing failed",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,
@@ -568,7 +567,7 @@ class BaseAgent(ABC):
                 # Publish next state for other states (EXTRACTED, BUDGET_CHECKED, etc.)
                 await self._publish_next_state(invoice_id, processing_result)
                 self.logger.info(
-                    f"Invoice processed successfully",
+                    "Invoice processed successfully",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,
@@ -677,7 +676,7 @@ class BaseAgent(ABC):
             )
             
             self.logger.info(
-                f"Published next-state message",
+                "Published next-state message",
                 extra={
                     "agent_name": self.agent_name,
                     "invoice_id": invoice_id,
@@ -797,7 +796,7 @@ class BaseAgent(ABC):
             
             if invoice_entity:
                 self.logger.debug(
-                    f"Invoice retrieved from storage",
+                    "Invoice retrieved from storage",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,
@@ -857,7 +856,7 @@ class BaseAgent(ABC):
             
             if success:
                 self.logger.debug(
-                    f"Invoice updated in storage",
+                    "Invoice updated in storage",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,
@@ -866,7 +865,7 @@ class BaseAgent(ABC):
                 )
             else:
                 self.logger.warning(
-                    f"Invoice update returned unexpected key",
+                    "Invoice update returned unexpected key",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,

@@ -15,8 +15,8 @@ from agents.approval_agent.tools.approval_status import ApprovalDecision, Approv
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.budget import BudgetStatus
 from shared.models.invoice import InvoiceState, ReviewStatus
-from shared.utils.constants import CompoundKeyStructure, InvoiceSubjects, SubscriptionNames
-from shared.utils.exceptions import BudgetNotFoundException, DocumentExtractionException, InvoiceApprovalException, InvoiceNotFoundException, StorageException, VendorNotFoundException
+from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from shared.utils.exceptions import BudgetNotFoundException, InvoiceApprovalException, InvoiceNotFoundException, StorageException, VendorNotFoundException
 
 class ApprovalAgent(BaseAgent):
     """
@@ -97,7 +97,7 @@ class ApprovalAgent(BaseAgent):
         correlation_id = message_data.get("correlation_id", invoice_id)
 
         self.logger.info(
-            f"Starting invoice extraction workflow",
+            "Starting invoice extraction workflow",
             extra={
                 "invoice_id": invoice_id,
                 "department_id": department_id,
@@ -137,7 +137,7 @@ class ApprovalAgent(BaseAgent):
                 task = self._handle_auto_approved(invoice_data, vendor_data, budget_data, correlation_id)
                 tasks.append(task)
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            _ = await asyncio.gather(*tasks, return_exceptions=True)
 
             return {
                 "invoice_id": invoice_id,
@@ -148,7 +148,7 @@ class ApprovalAgent(BaseAgent):
                 "correlation_id": correlation_id,
             }
         
-        except InvoiceNotFoundException as e:
+        except InvoiceNotFoundException:
             self.logger.error(
                 f"Invoice not found: {invoice_id}",
                 extra={
@@ -160,7 +160,7 @@ class ApprovalAgent(BaseAgent):
                 exc_info=True
             )
             raise
-        except VendorNotFoundException as e:
+        except VendorNotFoundException:
             self.logger.error(
                 f"Vendor not found for invoice: {invoice_id}",
                 extra={
@@ -173,7 +173,7 @@ class ApprovalAgent(BaseAgent):
                 exc_info=True
             )
             raise
-        except BudgetNotFoundException as e:
+        except BudgetNotFoundException:
             self.logger.error(
                 f"Budget not found for invoice: {invoice_id}",
                 extra={

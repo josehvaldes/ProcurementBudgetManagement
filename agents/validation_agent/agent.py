@@ -184,7 +184,7 @@ class ValidationAgent(BaseAgent):
             raise ValueError("invoice_id and department_id are required in message_data")
         
         self.logger.info(
-            f"Starting invoice validation workflow",
+            "Starting invoice validation workflow",
             extra={
                 "invoice_id": invoice_id,
                 "department_id": department_id,
@@ -224,7 +224,7 @@ class ValidationAgent(BaseAgent):
             )
             
             self.logger.info(
-                f"Invoice validation completed",
+                "Invoice validation completed",
                 extra={
                     "invoice_id": invoice_id,
                     "department_id": department_id,
@@ -246,7 +246,7 @@ class ValidationAgent(BaseAgent):
                 "correlation_id": correlation_id
             }
             
-        except InvoiceNotFoundException as e:
+        except InvoiceNotFoundException:
             self.logger.error(
                 f"Invoice not found: {invoice_id}",
                 extra={

@@ -9,7 +9,7 @@ def get_static_approval_policy():
         try:
             with open("agents/approval_agent/tools/approval_policy.yaml", "r") as f:
                 _static_approval_policy = f.read()
-        except Exception as e:
+        except Exception:
             _static_approval_policy = None
 
     return _static_approval_policy
