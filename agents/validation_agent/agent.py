@@ -680,7 +680,7 @@ class ValidationAgent(BaseAgent):
         Returns:
             Subject name for invoice.validated messages
         """
-        return InvoiceSubjects.VALIDATED.value
+        return InvoiceSubjects.VALIDATED
 
 
 if __name__ == "__main__":

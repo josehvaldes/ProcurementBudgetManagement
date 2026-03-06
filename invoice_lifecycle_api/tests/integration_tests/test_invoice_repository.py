@@ -101,8 +101,8 @@ class TestInvoiceRepository:
 
     @pytest.mark.asyncio
     async def test_get_entity(self, invoice_repository: TableServiceInterface):
-        partition_key = "FIN"
-        row_key = "865ce3705266"
+        partition_key = "HR"
+        row_key = "c653e6b6e38b"
         print(f"Retrieving entity with Partition Key: {partition_key}, Row Key: {row_key}")
         entity = await invoice_repository.get_entity(partition_key, row_key)
         invoice: Invoice = Invoice.from_dict(entity) if entity else None

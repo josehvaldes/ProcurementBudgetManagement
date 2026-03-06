@@ -390,7 +390,7 @@ class TableStorageService(TableServiceInterface):
             else:
                 raise EntityQueryException("Join operator must be specified when multiple filters are provided.")
 
-            logger.info(
+            logger.debug(
                 "Querying entities with custom filters",
                 extra={
                     "table_name": self.table_name,
@@ -401,7 +401,6 @@ class TableStorageService(TableServiceInterface):
                 }
             )
             effective_page_size = max_size if max_size else None
-            print(f"Debug - filter query: {name_filter}, parameters: {parameters}")
             entities = self.table_client.query_entities(
                 query_filter=name_filter,
                 parameters=parameters,

@@ -24,7 +24,7 @@ shutdown_event = asyncio.Event()
 
 class OutboxPublisher:
     
-    MAX_BATCH_SIZE = 10  # Max number of messages to publish in one batch
+    MAX_BATCH_SIZE = settings.outbox_max_batch_size  # Max number of messages to publish in one batch
 
     def __init__(self):
 
@@ -69,16 +69,17 @@ class OutboxPublisher:
             logger.info("Checking outbox for messages to publish")
             for agent_name in agent_names:
                 filters =  [("PartitionKey", agent_name, CompareOperator.EQUAL.value)]
+                logger.debug(f"Querying outbox for agent '{agent_name}'",
+                             extra={
+                                 "filters": filters
+                             })
                 entities = await self.outbox_table.query_entities_with_filters(
                     filters=filters,
                     max_size=self.MAX_BATCH_SIZE
                 )
-                if entities:
+                if entities and len(entities) > 0:
                     logger.info(f"Found {len(entities)} messages for agent '{agent_name}' to publish",
-                                extra={
-                                    "agent_name": agent_name,
-                                    "message_count": len(entities)
-                                })
+                                extra={"message_count": len(entities)})
                     for entity in entities:
                         body = {
                             "invoice_id": entity.get("invoice_id"),
@@ -92,15 +93,15 @@ class OutboxPublisher:
                             "body": body
                         }
                         try:
+                            logger.debug(f"Publishing message to Service Bus for agent '{agent_name}'",
+                                         extra={"message_payload": message_payload})
+
                             await self.service_bus_client.publish_message(
                                 topic_name=settings.service_bus_topic_name,
                                 message_body=message_payload
                             )
                             logger.debug(f"Published message to Service Bus for agent '{agent_name}'",
-                                         extra={
-                                             "agent_name": agent_name,
-                                             "message_id": message_payload.get("RowKey")
-                                         })
+                                         extra={"message_id": message_payload.get("RowKey")})
                             partition_key = entity.get("agent_name")
                             row_key = entity.get("compound_key")
                             # Delete the message from the outbox after successful publish
@@ -108,18 +109,12 @@ class OutboxPublisher:
                                 partition_key=partition_key,
                                 row_key=row_key
                             )
-                            logger.debug(f"Deleted message from outbox for agent '{agent_name}'",
-                                         extra={
-                                             "agent_name": agent_name,
-                                             "message_id": row_key
-                                         })
                         except Exception as e:
                             logger.error(f"Error publishing message for agent '{agent_name}': {str(e)}",
                                          exc_info=True,
-                                         extra={
-                                             "agent_name": agent_name,
-                                             "message_id": row_key
-                                         })
+                                         extra={"message_id": row_key})
+                else:
+                    logger.debug(f"No messages found in outbox for agent: '{agent_name}'")
 
             logger.debug("Outbox check completed successfully")
         except Exception as e:
@@ -213,17 +208,18 @@ async def check_outbox(publisher: OutboxPublisher):
         logger.error(f"Error in check_outbox: {str(e)}", exc_info=True)
 
 async def main():
-    logger.info(" * Starting Outbox Publisher Agent")
+    logger.info("Starting Outbox Publisher Agent")
     setup_signal_handlers()
-    execution_time = 10 # seconds
+    interval_time = settings.outbox_poll_interval_seconds
     async with OutboxPublisher() as publisher:
-        print(" * Signal handlers set up successfully.")
+        logger.info("Signal handlers set up successfully.")
         scheduler.add_job(check_outbox, 'interval', 
-                          seconds=execution_time, 
+                          seconds=interval_time, 
                           kwargs={"publisher": publisher}
                           )
         scheduler.start()
         while not shutdown_event.is_set():
+            print("sleeping...")
             await asyncio.sleep(5)
 
 if __name__ == "__main__":

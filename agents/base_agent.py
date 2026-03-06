@@ -817,33 +817,20 @@ class BaseAgent(ABC):
             )
         
         try:
-            returned_key = await self.invoice_table.upsert_entity(
+            _ = await self.invoice_table.upsert_entity(
                 entity=invoice,
                 partition_key=department_id,
                 row_key=invoice_id
             )
             
-            success = returned_key == invoice_id
-            
-            if success:
-                self.logger.debug(
-                    "Invoice updated in storage",
-                    extra={
-                        "agent_name": self.agent_name,
-                        "invoice_id": invoice_id,
-                        "department_id": department_id
-                    }
-                )
-            else:
-                self.logger.error(
-                    "Invoice update returned unexpected key",
-                    extra={
-                        "agent_name": self.agent_name,
-                        "invoice_id": invoice_id,
-                        "returned_key": returned_key
-                    }
-                )
-                raise InvoiceProcessingException("Outbox message write did not return expected row key")
+            self.logger.debug(
+                "Invoice updated in storage",
+                extra={
+                    "agent_name": self.agent_name,
+                    "invoice_id": invoice_id,
+                    "department_id": department_id
+                }
+            )
         except Exception as e:
             error_msg = f"Failed to update invoice in storage: {str(e)}"
             self.logger.error(
@@ -879,7 +866,7 @@ class BaseAgent(ABC):
             StorageException: If writing to storage fails
         """
         try:
-            self.logger.debug(
+            self.logger.info(
                 "Writing outbox message",
                 extra={
                     "agent_name": self.agent_name,
@@ -887,13 +874,11 @@ class BaseAgent(ABC):
                     "row_key": row_key
                 }
             )
-            entity_id = self.outbox_table.upsert_entity(
+            entity_id = await self.outbox_table.upsert_entity(
                 entity=entity,
                 partition_key=partition_key,
                 row_key=row_key
             )
-            if entity_id == row_key:
-                raise InvoiceProcessingException("Outbox message write did not return expected row key")
         except Exception as e:
             error_msg = f"Failed to write outbox message: {str(e)}"
             self.logger.error(
@@ -940,7 +925,6 @@ class BaseAgent(ABC):
             "state": new_state,
             "event_type": event_type,
             "subject": next_subject,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
             "correlation_id": correlation_id
         }
 

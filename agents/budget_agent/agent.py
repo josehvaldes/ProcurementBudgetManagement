@@ -830,7 +830,7 @@ class BudgetAgent(BaseAgent):
         Returns:
             Subject name for invoice.budget_checked messages
         """
-        return InvoiceSubjects.BUDGET_CHECKED.value
+        return InvoiceSubjects.BUDGET_CHECKED
 
 
 if __name__ == "__main__":

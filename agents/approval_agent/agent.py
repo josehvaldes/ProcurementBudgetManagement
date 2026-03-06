@@ -97,7 +97,7 @@ class ApprovalAgent(BaseAgent):
         correlation_id = message_data.get("correlation_id", invoice_id)
 
         self.logger.info(
-            "Starting invoice extraction workflow",
+            "Starting invoice approval workflow",
             extra={
                 "invoice_id": invoice_id,
                 "department_id": department_id,

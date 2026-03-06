@@ -311,7 +311,7 @@ class IntakeAgent(BaseAgent):
             InvoiceNotFoundException: If invoice not found
             StorageException: If retrieval fails
         """
-        self.logger.debug(
+        self.logger.info(
             "Retrieving invoice metadata",
             extra={
                 "invoice_id": invoice_id,
@@ -576,9 +576,9 @@ class IntakeAgent(BaseAgent):
             
             # Persist to storage
             await self.complete_processing(
-                invoice = invoice_obj.to_dict(),
-                new_state = InvoiceState.EXTRACTED.value,
-                event_type = SubscriptionNames.INTAKE_AGENT.value,
+                invoice=invoice_obj.to_dict(),
+                new_state=InvoiceState.EXTRACTED.value,
+                event_type=SubscriptionNames.INTAKE_AGENT,
                 correlation_id=correlation_id
                 )
             
@@ -603,7 +603,7 @@ class IntakeAgent(BaseAgent):
         Returns:
             Subject name for invoice.extracted messages
         """
-        return InvoiceSubjects.EXTRACTED.value
+        return InvoiceSubjects.EXTRACTED
 
 
 if __name__ == "__main__":

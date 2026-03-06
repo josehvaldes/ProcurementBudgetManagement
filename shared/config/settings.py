@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     require_po_match: bool = True
     require_budget_check: bool = True
     
+    #Outbox Pattern
+    outbox_poll_interval_seconds: int = 10
+    outbox_max_batch_size: int = 10
+    
     model_config = ConfigDict(
         str_max_length=200,
         env_file=".env",
