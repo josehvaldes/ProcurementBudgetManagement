@@ -17,7 +17,7 @@ from agents.base_agent import BaseAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.invoice import InvoiceState
 from shared.models.payment_batch_item import PaymentBatchItem, PaymentState
-from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from shared.utils.constants import AgentNames, InvoiceSubjects, SubscriptionNames
 from shared.utils.exceptions import InvoiceProcessingException, PaymentProcessingException, StorageException
 
 scheduler: AsyncIOScheduler = AsyncIOScheduler()
@@ -65,7 +65,7 @@ class PaymentAgent(BaseAgent):
     
     def __init__(self, shutdown_event: asyncio.Event = asyncio.Event(), start_scheduler: bool = True):
         super().__init__( 
-            agent_name="PaymentAgent",
+            agent_name=AgentNames.PAYMENT_AGENT,
             subscription_name=SubscriptionNames.PAYMENT_AGENT,
             shutdown_event=shutdown_event
         )

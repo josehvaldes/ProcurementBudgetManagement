@@ -17,7 +17,7 @@ from agents.base_agent import BaseAgent
 from agents.intake_agent.tools.invoice_analyzer_tool import InvoiceAnalyzerTool
 from agents.intake_agent.tools.qr_extractor import get_qr_info_from_bytes
 from shared.models.invoice import Invoice, InvoiceState
-from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from shared.utils.constants import AgentNames, InvoiceSubjects, SubscriptionNames
 from invoice_lifecycle_api.infrastructure.repositories.invoice_storage_service import InvoiceStorageService 
 from shared.config.settings import settings
 from shared.utils.exceptions import (
@@ -52,7 +52,7 @@ class IntakeAgent(BaseAgent):
             shutdown_event: Event to signal graceful shutdown
         """
         super().__init__(
-            agent_name="IntakeAgent",
+            agent_name=AgentNames.INTAKE_AGENT,
             subscription_name=SubscriptionNames.INTAKE_AGENT,
             shutdown_event=shutdown_event or asyncio.Event()
         )

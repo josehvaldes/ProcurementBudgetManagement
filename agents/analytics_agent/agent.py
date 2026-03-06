@@ -11,7 +11,7 @@ from langsmith import traceable
 from shared.config.settings import settings
 from agents.base_agent import BaseAgent
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
-from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from shared.utils.constants import AgentNames, InvoiceSubjects, SubscriptionNames
 from shared.utils.exceptions import (
     BudgetNotFoundException,
     EntityNotFoundException,
@@ -37,7 +37,7 @@ class AnalyticsAgent(BaseAgent):
 
     def __init__(self, shutdown_event: Optional[asyncio.Event] = None):
         super().__init__(
-            agent_name="AnalyticsAgent",
+            agent_name=AgentNames.ANALYTICS_AGENT,
             subscription_name=SubscriptionNames.ANALYTICS_AGENT,
             shutdown_event=shutdown_event or asyncio.Event(),
         )

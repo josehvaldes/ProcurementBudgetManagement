@@ -7,7 +7,7 @@ from typing import Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from invoice_lifecycle_api.application.interfaces.service_interfaces import CompareOperator, JoinOperator
 from shared.config.settings import settings
-from shared.utils.constants import SubscriptionNames
+from shared.utils.constants import AgentNames, SubscriptionNames
 from shared.utils.logging_config import get_logger, setup_logging
 from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
@@ -59,17 +59,17 @@ class OutboxPublisher:
         """Check the outbox table for messages and publish them to Service Bus."""
         try:
             agent_names = [
-                SubscriptionNames.INTAKE_AGENT,
-                SubscriptionNames.VALIDATION_AGENT,
-                SubscriptionNames.BUDGET_AGENT,
-                SubscriptionNames.APPROVAL_AGENT,
-                SubscriptionNames.PAYMENT_AGENT,
+                AgentNames.INTAKE_AGENT,
+                AgentNames.VALIDATION_AGENT,
+                AgentNames.BUDGET_AGENT,
+                AgentNames.APPROVAL_AGENT,
+                AgentNames.PAYMENT_AGENT,
             ]
 
             logger.info("Checking outbox for messages to publish")
             for agent_name in agent_names:
                 filters =  [("PartitionKey", agent_name, CompareOperator.EQUAL.value)]
-                logger.debug(f"Querying outbox for agent '{agent_name}'",
+                logger.info(f"Querying outbox for agent '{agent_name}'",
                              extra={
                                  "filters": filters
                              })
@@ -90,20 +90,19 @@ class OutboxPublisher:
                         }
                         message_payload = {
                             "subject": entity.get("subject"),
-                            "body": body
+                            "body": body,
+                            "correlation_id": entity.get("correlation_id"),
                         }
                         try:
-                            logger.debug(f"Publishing message to Service Bus for agent '{agent_name}'",
-                                         extra={"message_payload": message_payload})
-
+                            row_key = entity.get("compound_key")
                             await self.service_bus_client.publish_message(
-                                topic_name=settings.service_bus_topic_name,
-                                message_body=message_payload
+                                topic=settings.service_bus_topic_name,
+                                message_data=message_payload
                             )
-                            logger.debug(f"Published message to Service Bus for agent '{agent_name}'",
+                            logger.info(f"Published message to Service Bus for agent '{agent_name}'",
                                          extra={"message_id": message_payload.get("RowKey")})
                             partition_key = entity.get("agent_name")
-                            row_key = entity.get("compound_key")
+                            
                             # Delete the message from the outbox after successful publish
                             await self.outbox_table.delete_entity(
                                 partition_key=partition_key,

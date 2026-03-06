@@ -39,6 +39,14 @@ VALID_STATE_TRANSITIONS = {
     "PAID": [],
 }
 
+class AgentNames:
+    """Names for each agent in the invoice lifecycle."""
+    INTAKE_AGENT = "IntakeAgent"
+    VALIDATION_AGENT = "ValidationAgent"
+    BUDGET_AGENT = "BudgetAgent"
+    APPROVAL_AGENT = "ApprovalAgent"
+    PAYMENT_AGENT = "PaymentAgent"
+    ANALYTICS_AGENT = "AnalyticsAgent"
 
 # Subscription names for each agent
 class SubscriptionNames:

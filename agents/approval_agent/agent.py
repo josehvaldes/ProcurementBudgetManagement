@@ -15,7 +15,7 @@ from agents.approval_agent.tools.approval_status import ApprovalDecision, Approv
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.budget import BudgetStatus
 from shared.models.invoice import InvoiceState, ReviewStatus
-from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from shared.utils.constants import AgentNames, InvoiceSubjects, SubscriptionNames
 from shared.utils.exceptions import BudgetNotFoundException, InvoiceApprovalException, InvoiceNotFoundException, InvoiceProcessingException, StorageException, VendorNotFoundException
 
 class ApprovalAgent(BaseAgent):
@@ -32,7 +32,7 @@ class ApprovalAgent(BaseAgent):
     
     def __init__(self, shutdown_event: asyncio.Event = asyncio.Event()):
         super().__init__(
-            agent_name="ApprovalAgent",
+            agent_name=AgentNames.APPROVAL_AGENT,
             subscription_name=SubscriptionNames.APPROVAL_AGENT,
             shutdown_event=shutdown_event
         )

@@ -18,7 +18,7 @@ from agents.validation_agent.tools.agentic_validator import AgenticValidator
 from agents.validation_agent.tools.deterministic_validator import DeterministicValidator, ValidationResult
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.invoice import Invoice, InvoiceState
-from shared.utils.constants import InvoiceSubjects, SubscriptionNames
+from shared.utils.constants import AgentNames, InvoiceSubjects, SubscriptionNames
 from shared.config.settings import settings
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
@@ -53,7 +53,7 @@ class ValidationAgent(BaseAgent):
             shutdown_event: Event to signal graceful shutdown
         """
         super().__init__(
-            agent_name="ValidationAgent",
+            agent_name=AgentNames.VALIDATION_AGENT,
             subscription_name=SubscriptionNames.VALIDATION_AGENT,
             shutdown_event=shutdown_event or asyncio.Event()
         )

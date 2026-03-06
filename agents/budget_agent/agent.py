@@ -24,7 +24,7 @@ from agents.budget_agent.tools.budget_classification_agent import BudgetClassifi
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.config.settings import settings
 from shared.models.invoice import InvoiceInternalMessage, InvoiceState
-from shared.utils.constants import CompoundKeyStructure, InvoiceSubjects, SubscriptionNames
+from shared.utils.constants import AgentNames, CompoundKeyStructure, InvoiceSubjects, SubscriptionNames
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
     BudgetException,
@@ -62,7 +62,7 @@ class BudgetAgent(BaseAgent):
             shutdown_event: Event to signal graceful shutdown
         """
         super().__init__(
-            agent_name="BudgetAgent",
+            agent_name=AgentNames.BUDGET_AGENT,
             subscription_name=SubscriptionNames.BUDGET_AGENT,
             shutdown_event=shutdown_event or asyncio.Event()
         )
