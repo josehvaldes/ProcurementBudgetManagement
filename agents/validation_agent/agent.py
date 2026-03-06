@@ -22,6 +22,8 @@ from shared.utils.constants import InvoiceSubjects, SubscriptionNames
 from shared.config.settings import settings
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
+    InvoiceProcessingException,
+    ProcurementException,
     ValidationException,
     StorageException
 )
@@ -634,27 +636,22 @@ class ValidationAgent(BaseAgent):
             }
         )
         
-        try:
-            update_successful = await self.update_invoice(invoice_obj.to_dict())
-            
-            if not update_successful:
-                raise StorageException(
-                    f"Failed to update invoice in storage: {invoice_id}"
-                )
-            
-            self.logger.info(
-                "Invoice state persisted successfully",
-                extra={
-                    "invoice_id": invoice_id,
-                    "state": invoice_obj.state.value,
-                    "correlation_id": correlation_id
-                }
+        await self.complete_processing(
+            invoice=invoice_obj.to_dict(),
+            new_state=invoice_obj.state.value,
+            event_type=SubscriptionNames.VALIDATION_AGENT.value,
+            correlation_id=correlation_id
             )
-            
-        except Exception as e:
-            raise StorageException(
-                f"Failed to persist invoice state: {str(e)}"
-            ) from e
+        
+        self.logger.info(
+            "Invoice state persisted successfully",
+            extra={
+                "invoice_id": invoice_id,
+                "state": invoice_obj.state.value,
+                "correlation_id": correlation_id
+            }
+        )
+
 
     def _build_internal_messages(self, source: str, messages: list) -> list:
         """

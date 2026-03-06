@@ -23,6 +23,8 @@ from shared.config.settings import settings
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
     DocumentExtractionException,
+    InvoiceProcessingException,
+    ProcurementException,
     StorageException
 )
 
@@ -203,39 +205,34 @@ class IntakeAgent(BaseAgent):
             )
             
             # Step 5: Update invoice with extracted data
-            updated_invoice = await self._update_invoice_with_extraction(
+            await self._update_invoice_with_extraction(
                 invoice_data=invoice_data,
                 extracted_data=extracted_data,
                 qr_codes=qr_codes,
                 invoice_id=invoice_id,
                 correlation_id=correlation_id
             )
-            if updated_invoice is None:
-                raise DocumentExtractionException(
-                    f"Failed to update invoice after extraction: {invoice_id}"
-                )
-            else:
-                self.logger.info(
-                    "Invoice extraction completed successfully",
-                    extra={
-                        "invoice_id": invoice_id,
-                        "department_id": department_id,
-                        "correlation_id": correlation_id,
-                        "state": InvoiceState.EXTRACTED.value,
-                        "has_qr_codes": len(qr_codes) > 0,
-                        "qr_code_count": len(qr_codes)
-                    }
-                )
-                return {
+        
+            self.logger.info(
+                "Invoice extraction completed successfully",
+                extra={
                     "invoice_id": invoice_id,
                     "department_id": department_id,
-                    "event_type": "IntakeAgentCompleted",
+                    "correlation_id": correlation_id,
                     "state": InvoiceState.EXTRACTED.value,
-                    "extracted_at": datetime.now(timezone.utc).isoformat(),
-                    "correlation_id": correlation_id
+                    "has_qr_codes": len(qr_codes) > 0,
+                    "qr_code_count": len(qr_codes)
                 }
+            )
+            return {
+                "invoice_id": invoice_id,
+                "department_id": department_id,
+                "event_type": "IntakeAgentCompleted",
+                "state": InvoiceState.EXTRACTED.value,
+                "extracted_at": datetime.now(timezone.utc).isoformat(),
+                "correlation_id": correlation_id
+            }
                 
-            
         except InvoiceNotFoundException:
             self.logger.error(
                 f"Invoice not found: {invoice_id}",
@@ -540,7 +537,7 @@ class IntakeAgent(BaseAgent):
         qr_codes: list,
         invoice_id: str,
         correlation_id: str
-    ) -> Invoice:
+    ) -> None:
         """
         Update invoice with extracted data and change state.
         
@@ -578,11 +575,11 @@ class IntakeAgent(BaseAgent):
             invoice_obj.state = InvoiceState.EXTRACTED
             
             # Persist to storage
-            update_successful = await self.update_invoice(invoice_obj.to_dict())
-            
-            if not update_successful:
-                raise StorageException(
-                    f"Failed to update invoice in storage: {invoice_id}"
+            await self.complete_processing(
+                invoice = invoice_obj.to_dict(),
+                new_state = InvoiceState.EXTRACTED.value,
+                event_type = SubscriptionNames.INTAKE_AGENT.value,
+                correlation_id=correlation_id
                 )
             
             self.logger.info(
@@ -593,11 +590,9 @@ class IntakeAgent(BaseAgent):
                     "correlation_id": correlation_id
                 }
             )
-            
-            return invoice_obj
-            
+
         except Exception as e:
-            raise StorageException(
+            raise InvoiceProcessingException(
                 f"Failed to update invoice with extracted data: {str(e)}"
             ) from e
 

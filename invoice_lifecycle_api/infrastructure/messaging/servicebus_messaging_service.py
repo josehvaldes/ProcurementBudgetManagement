@@ -1,7 +1,7 @@
 import asyncio
 import json
 from typing import Optional
-from azure.servicebus import ServiceBusMessage, ServiceBusSender
+from azure.servicebus import ServiceBusMessage, ServiceBusSender, ServiceBusSubQueue
 from azure.servicebus.aio import ServiceBusClient
 from azure.servicebus.exceptions import ServiceBusError
 
@@ -31,7 +31,7 @@ class ServiceBusMessagingService(MessagingServiceInterface):
         subscribers (list): List of active subscription receivers
     """
     
-    def __init__(self, host_name: Optional[str] = None, topic_name: Optional[str] = None):
+    def __init__(self, host_name: Optional[str] = None, topic_name: Optional[str] = None, auto_close: bool = False):
         """
         Initialize Service Bus messaging service.
         
@@ -47,12 +47,14 @@ class ServiceBusMessagingService(MessagingServiceInterface):
         self.subscribers = []    
         self.topic_name = topic_name or settings.service_bus_topic_name
         self.service_bus_host_name = host_name or settings.service_bus_host_name
-        
+        self.auto_close = auto_close
+
         logger.info(
             "Initializing Service Bus messaging service",
             extra={
                 "service_bus_namespace": self.service_bus_host_name,
-                "default_topic": self.topic_name
+                "default_topic": self.topic_name,
+                "auto_close": self.auto_close
             }
         )
         
@@ -199,6 +201,81 @@ class ServiceBusMessagingService(MessagingServiceInterface):
                         "correlation_id": correlation_id
                     }
                 )
+
+    def get_subscription_dead_letter_receiver(
+        self, 
+        subscription: str, 
+        shutdown_event: asyncio.Event,
+        peek_mode: bool = False
+    ) -> SubscriptionReceiverWrapper:
+        """
+        Create and register a subscription receiver for the dead letter queue.
+
+        Args:
+            subscription: Subscription name to receive messages from
+            shutdown_event: Asyncio event to signal graceful shutdown
+            peek_mode: Whether to use peek mode for receiving messages
+
+        Returns:
+            SubscriptionReceiverWrapper configured for the subscription dead letter queue
+            
+        Note:
+            The receiver is automatically tracked and will be closed during service shutdown.
+            
+        Example:
+            shutdown_event = asyncio.Event()
+            receiver = service.get_subscription_dead_letter_receiver("budget-agent-sub", shutdown_event)
+            async for message in receiver:
+                # Process message
+                await receiver.complete_message(message)
+        """
+        logger.info(
+            "Creating subscription receiver",
+            extra={
+                "topic": self.topic_name,
+                "subscription": subscription
+            }
+        )
+        
+        try:
+            subscription_receiver = SubscriptionReceiverWrapper(
+                self.servicebus_client,
+                self.topic_name, 
+                subscription, 
+                shutdown_event,
+                sub_queue=ServiceBusSubQueue.DEAD_LETTER,
+                peek_mode=peek_mode
+            )
+            
+            self.subscribers.append(subscription_receiver)
+            logger.info(
+                "Dead letter subscription receiver created successfully",
+                extra={
+                    "topic": self.topic_name,
+                    "subscription": subscription,
+                    "total_subscribers": len(self.subscribers)
+                }
+            )
+            
+            return subscription_receiver
+            
+        except Exception as e:
+            logger.error(
+                "Failed to create dead letter subscription receiver",
+                extra={
+                    "topic": self.topic_name,
+                    "subscription": subscription,
+                    "error_type": "ReceiverCreationFailed",
+                    "error_details": str(e)
+                },
+                exc_info=True
+            )
+            raise MessagingException(
+                f"Failed to create dead letter subscription receiver for '{subscription}': {str(e)}"
+            ) from e
+
+        
+
 
     def get_subscription_receiver(
         self, 
@@ -349,3 +426,16 @@ class ServiceBusMessagingService(MessagingServiceInterface):
                     exc_info=True
                 )
                 # Don't re-raise - we're shutting down anyway
+
+    async def __aenter__(self) -> "ServiceBusMessagingService":
+        """Enter async context manager."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit async context manager and close resources."""
+        if self.auto_close:
+            logger.info(
+                "Exiting context for ServiceBusMessagingService (auto close)",
+                extra={"service_bus_namespace": self.service_bus_host_name}
+            )
+            await self.close()

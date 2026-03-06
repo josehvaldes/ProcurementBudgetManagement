@@ -31,6 +31,11 @@ class TestMessagingService:
         self.shutdown_event: asyncio.Event = asyncio.Event()
 
     def setup(self):
+        self.messaging_service: MessagingServiceInterface = ServiceBusMessagingService(
+            host_name=settings.service_bus_host_name,
+            topic_name=settings.service_bus_topic_name
+        )
+                
         """Setup signal handlers.""" 
         def handle_signal(sig, frame):
             sig_name = signal.Signals(sig).name
@@ -48,13 +53,6 @@ class TestMessagingService:
             signal.signal(signal.SIGBREAK, handle_signal)
 
 
-    def setup_method(self):
-        self.messaging_service: MessagingServiceInterface = ServiceBusMessagingService(
-            host_name=settings.service_bus_host_name,
-            topic_name=settings.service_bus_topic_name
-        )
-
-        
     async def test_send_message(self):
         try:
             invoice_id = uuid.uuid4().hex[:12]
@@ -135,7 +133,6 @@ class TestMessagingService:
             print(f"Error during iterative message receiving: {e}")
             traceback.print_exc()
 
-
     async def close_repositories(self):
         tasks = []
         tasks.append(self.messaging_service.close())
@@ -144,31 +141,37 @@ class TestMessagingService:
 
         logger.info("Closed all repository services and credential manager.")
 
+    async def __aenter__(self) -> "TestMessagingService":
+        """Enter async context manager."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit async context manager and close resources."""
+        await self.close_repositories()
+
 async def main():
-    test_instance = TestMessagingService()
-    test_instance.setup()
-    test_instance.setup_method()
-    
+
     parser = argparse.ArgumentParser(description="Azure Storage Messaging Service Tests")
     parser.add_argument("action", type=str, help="Action to perform: send, receive, iterative",
-                       choices=["send", "receive", "iterative"])
+                    choices=["send", "receive", "iterative"])
     args = parser.parse_args()
     
     logger.info(f"Running test for action: {args.action}")
-    
-    # Map actions to test methods
-    test_map = {
-        "send": test_instance.test_send_message,
-        "receive": test_instance.test_single_receive_message,
-        "iterative": test_instance.test_iterative_receive_messages,
-    }
 
-    # Run the selected test
-    test_method = test_map.get(args.action)
-    if test_method:
-        await test_method()
+    async with TestMessagingService() as test_instance:
+        test_instance.setup()
 
-    await test_instance.close_repositories()
+        # Map actions to test methods
+        test_map = {
+            "send": test_instance.test_send_message,
+            "receive": test_instance.test_single_receive_message,
+            "iterative": test_instance.test_iterative_receive_messages,
+        }
+
+        # Run the selected test
+        test_method = test_map.get(args.action)
+        if test_method:
+            await test_method()
     
     print("All tests completed.")
 

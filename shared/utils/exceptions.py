@@ -142,3 +142,18 @@ class PaymentSchedulingException(ProcurementException):
 class PaymentProcessingException(ProcurementException):
     """Raised when processing payment for an invoice fails."""
     pass
+
+
+# Outbox exceptions
+
+class InvoiceProcessingException(ProcurementException):
+    """Raised when processing an invoice fails."""
+    pass
+
+class OutboxException(Exception):
+    """Base exception for outbox operations."""
+    pass
+
+class OutboxMessageWriteException(OutboxException):
+    """Raised when writing an outbox message fails."""
+    pass

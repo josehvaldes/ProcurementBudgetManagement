@@ -108,6 +108,12 @@ class MessagingServiceInterface(ABC):
         pass
 
     @abstractmethod
+    def get_subscription_dead_letter_receiver(self, subscription: str, shutdown_event: asyncio.Event) -> SubscriptionReceiverWrapper:
+        """Get a receiver for the specified subscription's dead letter queue."""
+        pass
+
+
+    @abstractmethod
     async def close(self) -> None:
         """Close any resources held by the service."""
         pass

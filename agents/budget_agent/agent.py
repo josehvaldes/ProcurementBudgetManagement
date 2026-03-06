@@ -28,6 +28,8 @@ from shared.utils.constants import CompoundKeyStructure, InvoiceSubjects, Subscr
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
     BudgetException,
+    InvoiceProcessingException,
+    ProcurementException,
     StorageException
 )
 
@@ -697,12 +699,12 @@ class BudgetAgent(BaseAgent):
             })
             
             # Persist to storage
-            update_successful = await self.update_invoice(invoice_data)
-            
-            if not update_successful:
-                raise StorageException(
-                    f"Failed to update invoice in storage: {invoice_id}"
-                )
+            await self.complete_processing(
+                invoice=invoice_data,
+                new_state=InvoiceState.BUDGET_CHECKED.value,
+                event_type=SubscriptionNames.BUDGET_AGENT,
+                correlation_id=correlation_id
+                )            
             
             self.logger.info(
                 "Invoice updated with budget analysis",
@@ -712,11 +714,8 @@ class BudgetAgent(BaseAgent):
                     "correlation_id": correlation_id
                 }
             )
-            
-        except StorageException:
-            raise
         except Exception as e:
-            raise StorageException(
+            raise InvoiceProcessingException(
                 f"Failed to update invoice with budget analysis: {str(e)}"
             ) from e
 

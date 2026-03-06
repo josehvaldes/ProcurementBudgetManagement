@@ -1,21 +1,31 @@
 import asyncio
 from azure.servicebus.aio import ServiceBusClient, ServiceBusReceiver
-from azure.servicebus import ServiceBusReceivedMessage
+from azure.servicebus import ServiceBusReceivedMessage, ServiceBusSubQueue
 from shared.utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 class SubscriptionReceiverWrapper:
-    def __init__(self, servicebus_client: ServiceBusClient, topic: str, subscription: str, shutdown_event: asyncio.Event):
+    def __init__(self, 
+                 servicebus_client: ServiceBusClient, 
+                 topic: str, 
+                 subscription: str, 
+                 shutdown_event: asyncio.Event, 
+                 sub_queue: ServiceBusSubQueue = None,
+                 peek_mode: bool = False
+                 ):
         self.servicebus_client = servicebus_client
         self.topic = topic
         self.subscription = subscription
         self.receiver: ServiceBusReceiver | None = None
         self.shutdown_event = shutdown_event
+        self.sub_queue = sub_queue
+        self.peek_mode = peek_mode
 
     async def __aenter__(self):
         self.receiver = self.servicebus_client.get_subscription_receiver(
             topic_name=self.topic, 
-            subscription_name=self.subscription
+            subscription_name=self.subscription,
+            sub_queue=self.sub_queue
         )
         await self.receiver.__aenter__()
         return self
@@ -42,10 +52,16 @@ class SubscriptionReceiverWrapper:
         try:
             while self.shutdown_event.is_set() is False:
                 # Receive one message at a time
-                messages = await self.receiver.receive_messages(
-                    max_message_count=1,
-                    max_wait_time=5
-                )
+                if self.peek_mode:
+                    messages = await self.receiver.peek_messages(
+                        max_message_count=1,
+                        timeout=5
+                    )
+                else:
+                    messages = await self.receiver.receive_messages(
+                        max_message_count=1,
+                        max_wait_time=5
+                    )
                 
                 if messages:
                     return messages[0]
@@ -67,11 +83,17 @@ class SubscriptionReceiverWrapper:
         """Receive multiple messages from the subscription."""
         if not self.receiver:
             raise RuntimeError("Receiver not initialized. Use async with context manager.")
-        
-        messages = await self.receiver.receive_messages(
-            max_message_count=max_message_count,
-            max_wait_time=max_wait_time
-        )
+        logger.info(f".Receiving up to {max_message_count} messages with max wait time of {max_wait_time} seconds from subscription '{self.subscription}' (peek_mode={self.peek_mode})...")
+        if self.peek_mode:
+            messages = await self.receiver.peek_messages(
+                max_message_count=max_message_count,
+                timeout=max_wait_time
+            )
+        else:
+            messages = await self.receiver.receive_messages(
+                max_message_count=max_message_count,
+                max_wait_time=max_wait_time
+            )
         return messages
 
     async def complete_message(self, message: ServiceBusReceivedMessage) -> None:

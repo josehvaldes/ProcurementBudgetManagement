@@ -28,16 +28,19 @@ from langsmith.run_helpers import get_current_run_tree
 from azure.servicebus import ServiceBusReceivedMessage
 from azure.core.exceptions import AzureError
 
+from shared.utils.logging_config import get_logger, setup_logging
+from shared.config.settings import settings
+
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.infrastructure.messaging.servicebus_messaging_service import ServiceBusMessagingService
 from invoice_lifecycle_api.infrastructure.messaging.subscription_receiver_wrapper import SubscriptionReceiverWrapper
 from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
 from shared.models.invoice import InvoiceInternalMessage, InvoiceState
 from shared.utils.constants import CompoundKeyStructure
-from shared.utils.logging_config import get_logger, setup_logging
-from shared.config.settings import settings
+
 from shared.utils.exceptions import (
     BudgetNotFoundException,
+    InvoiceProcessingException,
     StorageException,
     MessagingException,
     VendorNotFoundException
@@ -50,6 +53,15 @@ setup_logging(
     log_to_console=settings.log_to_console
 )
 
+publishing_state_list = [
+    InvoiceState.EXTRACTED.value,
+    InvoiceState.VALIDATED.value,
+    InvoiceState.BUDGET_CHECKED.value]
+non_publishing_state_list = [
+    InvoiceState.MANUAL_REVIEW.value,
+    InvoiceState.PAYMENT_SCHEDULED.value,
+    InvoiceState.FAILED.value
+]
 
 class BaseAgent(ABC):
     """
@@ -109,6 +121,7 @@ class BaseAgent(ABC):
         self.invoice_table: Optional[TableStorageService] = None
         self.vendor_table: Optional[TableStorageService] = None
         self.budget_table: Optional[TableStorageService] = None
+        self.outbox_table: Optional[TableStorageService] = None
 
         # Initialize infrastructure
         self._initialize_clients()
@@ -162,6 +175,12 @@ class BaseAgent(ABC):
                 table_name=settings.budgets_table_name
             )
             self.logger.debug("Budget Table Storage client initialized successfully")
+
+            self.outbox_table = TableStorageService(
+                storage_account_url=settings.table_storage_account_url,
+                table_name=settings.out_box_queue_table_name
+            )
+            self.logger.debug("Outbox Table Storage client initialized successfully")
 
             # Initialize Service Bus client for message processing
             self.service_bus_client = ServiceBusMessagingService(
@@ -487,64 +506,18 @@ class BaseAgent(ABC):
             
             # Check invoice state from processing result
             invoice_state = processing_result.get("state")
-            
-            # Handle state-specific logic
-            if invoice_state == InvoiceState.EXTRACTED.value or \
-               invoice_state == InvoiceState.VALIDATED.value or \
-               invoice_state == InvoiceState.BUDGET_CHECKED.value:
-                
-                # Successful states - publish next state message
-                await self._publish_next_state(invoice_id, processing_result)
-                self.logger.info(
-                    f"Invoice successfully processed to state {invoice_state}",
-                    extra={
-                        "agent_name": self.agent_name,
-                        "invoice_id": invoice_id,
-                        "state": invoice_state,
-                        "correlation_id": correlation_id
-                    }
-                )
-                return MessageProcessingResult(
-                    success=True,
-                    invoice_id=invoice_id,
-                    state=invoice_state
-                )
-                
-            elif invoice_state == InvoiceState.MANUAL_REVIEW.value:
-                # Requires manual review - no automatic next step
-                self.logger.info(
-                    "Invoice requires manual review - no automatic progression",
-                    extra={
-                        "agent_name": self.agent_name,
-                        "invoice_id": invoice_id,
-                        "state": invoice_state,
-                        "correlation_id": correlation_id
-                    }
-                )
-                return MessageProcessingResult(
-                    success=True,
-                    invoice_id=invoice_id,
-                    state=invoice_state,
-                    requires_manual_review=True
-                )
-            elif invoice_state == InvoiceState.PAYMENT_SCHEDULED.value:
-                # Payment scheduled - terminal state for this agent
-                self.logger.info(
-                    "Invoice payment scheduled - processing complete",
-                    extra={
-                        "agent_name": self.agent_name,
-                        "invoice_id": invoice_id,
-                        "state": invoice_state,
-                        "correlation_id": correlation_id
-                    }
-                )
-                return MessageProcessingResult(
-                    success=True,
-                    invoice_id=invoice_id,
-                    state=invoice_state
-                )
 
-            elif invoice_state == InvoiceState.FAILED.value:
+            self.logger.info(
+                "Invoice requires manual review - no automatic progression",
+                extra={
+                    "agent_name": self.agent_name,
+                    "invoice_id": invoice_id,
+                    "state": invoice_state,
+                    "correlation_id": correlation_id
+                }
+            )
+
+            if invoice_state == InvoiceState.FAILED.value:
                 # Processing failed - mark as unsuccessful
                 self.logger.warning(
                     "Invoice processing failed",
@@ -562,12 +535,9 @@ class BaseAgent(ABC):
                     failure_reason="ProcessingFailed",
                     failure_description="Invoice validation or processing failed"
                 )
-                
             else:
-                # Publish next state for other states (EXTRACTED, BUDGET_CHECKED, etc.)
-                await self._publish_next_state(invoice_id, processing_result)
                 self.logger.info(
-                    "Invoice processed successfully",
+                    f"Invoice successfully processed to state {invoice_state}",
                     extra={
                         "agent_name": self.agent_name,
                         "invoice_id": invoice_id,
@@ -578,8 +548,9 @@ class BaseAgent(ABC):
                 return MessageProcessingResult(
                     success=True,
                     invoice_id=invoice_id,
-                    state=invoice_state
-                )
+                    state=invoice_state,
+                    requires_manual_review=invoice_state == InvoiceState.MANUAL_REVIEW.value
+                )            
             
         except ValueError as e:
             # Validation error - message format issue
@@ -823,7 +794,7 @@ class BaseAgent(ABC):
     async def update_invoice(
         self,
         invoice: Dict[str, Any]
-    ) -> bool:
+    ) -> None:
         """
         Update invoice in Table Storage.
         
@@ -864,7 +835,7 @@ class BaseAgent(ABC):
                     }
                 )
             else:
-                self.logger.warning(
+                self.logger.error(
                     "Invoice update returned unexpected key",
                     extra={
                         "agent_name": self.agent_name,
@@ -872,9 +843,7 @@ class BaseAgent(ABC):
                         "returned_key": returned_key
                     }
                 )
-            
-            return success
-            
+                raise InvoiceProcessingException("Outbox message write did not return expected row key")
         except Exception as e:
             error_msg = f"Failed to update invoice in storage: {str(e)}"
             self.logger.error(
@@ -889,6 +858,129 @@ class BaseAgent(ABC):
             )
             raise StorageException(error_msg) from e
     
+    async def write_outbox_message(
+        self,
+        entity: Dict[str, Any],
+        partition_key: str,
+        row_key: str
+    ) -> None:
+        """
+        Write a message to the outbox table for reliable messaging.
+
+        Args:
+            entity: Message entity to write
+            partition_key: Partition key for the outbox table
+            row_key: Row key for the outbox table
+
+        Returns:
+            True if write successful, False otherwise
+
+        Raises:
+            StorageException: If writing to storage fails
+        """
+        try:
+            self.logger.debug(
+                "Writing outbox message",
+                extra={
+                    "agent_name": self.agent_name,
+                    "partition_key": partition_key,
+                    "row_key": row_key
+                }
+            )
+            entity_id = self.outbox_table.upsert_entity(
+                entity=entity,
+                partition_key=partition_key,
+                row_key=row_key
+            )
+            if entity_id == row_key:
+                raise InvoiceProcessingException("Outbox message write did not return expected row key")
+        except Exception as e:
+            error_msg = f"Failed to write outbox message: {str(e)}"
+            self.logger.error(
+                error_msg,
+                exc_info=True,
+                extra={
+                    "agent_name": self.agent_name,
+                    "entity": entity
+                }
+            )
+            raise InvoiceProcessingException(error_msg) from e
+
+
+    async def complete_processing(
+        self,
+        invoice: Dict[str, Any],
+        new_state: str,
+        event_type: str,
+        correlation_id: str
+    ) -> None:
+        """
+        Write a message to the outbox table for reliable messaging.
+        
+        Args:
+            message: Message dictionary containing at least 'invoice_id' and 'payload'
+        Raises:
+            ValueError: If required fields are missing in the message
+            StorageException: If writing to storage fails
+        """
+        next_subject = self.get_next_subject()
+        invoice_state = invoice.get("state")
+        partition_key = self.agent_name  # Use agent name as partition key for outbox messages
+        row_key = f"{invoice.get("invoice_id")}:{int(time.time() * 1000)}"  # Use invoice_id and timestamp for uniqueness
+        if not partition_key or not row_key:
+            raise ValueError(
+                "Outbox message must contain 'department_id' and 'invoice_id' fields"
+            )
+        
+        entity = {
+            "agent_name": self.agent_name,
+            "compound_key": f"{row_key}",
+            "invoice_id": invoice.get("invoice_id"),
+            "department_id": invoice.get("department_id"),            
+            "state": new_state,
+            "event_type": event_type,
+            "subject": next_subject,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "correlation_id": correlation_id
+        }
+
+        original_invoice = None
+        try:
+            original_invoice = self.get_invoice(department_id= invoice.get("department_id"),
+                                            invoice_id=invoice.get("invoice_id"))
+            # Ensure invoice is updated before writing outbox message
+            await self.update_invoice(invoice)
+            if invoice_state in publishing_state_list:
+                await self.write_outbox_message(
+                        entity=entity,
+                        partition_key=partition_key,
+                        row_key=row_key
+                    )
+            else:
+                self.logger.warning(
+                    f"Invoice in state {invoice_state} will not be published to next stage",
+                    extra={
+                        "agent_name": self.agent_name,
+                        "invoice_id": invoice.get("invoice_id"),
+                        "state": invoice_state,
+                    }
+                )
+        except Exception as e:
+            # Rollback invoice update if outbox message fails
+            if original_invoice:
+                await self.update_invoice(original_invoice)  
+            self.logger.error(
+                "Failed to write outbox message after successful invoice update",
+                extra={
+                    "agent_name": self.agent_name,
+                    "invoice_id": invoice.get("invoice_id"),
+                    "correlation_id": correlation_id
+                }
+            )
+            raise InvoiceProcessingException(
+                f"Failed to write outbox message after successful invoice update: {str(e)}"
+            ) from e
+
     def _build_internal_messages(
         self,
         code: str,
@@ -966,6 +1058,15 @@ class BaseAgent(ABC):
                 self.logger.debug("Budget table client closed successfully")
             except Exception as e:
                 error_msg = f"Error closing budget table client: {str(e)}"
+                self.logger.warning(error_msg, exc_info=True)
+                cleanup_errors.append(error_msg)
+        
+        if self.outbox_table:
+            try:
+                await self.outbox_table.close()
+                self.logger.debug("Outbox table client closed successfully")
+            except Exception as e:
+                error_msg = f"Error closing outbox table client: {str(e)}"
                 self.logger.warning(error_msg, exc_info=True)
                 cleanup_errors.append(error_msg)
 

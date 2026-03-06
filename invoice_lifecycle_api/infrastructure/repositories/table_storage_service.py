@@ -348,7 +348,8 @@ class TableStorageService(TableServiceInterface):
         self, 
         filters: list[tuple[str, str, str]], 
         join_operator: JoinOperator = JoinOperator.AND,
-        correlation_id: Optional[str] = None
+        correlation_id: Optional[str] = None,
+        max_size: Optional[int] = None
     ) -> list[dict]:
         """
         Query entities from Azure Table Storage using custom filters.
@@ -376,10 +377,18 @@ class TableStorageService(TableServiceInterface):
                     index += 1
                 parameters[param_name] = value
             
-            name_filter = f"{join_operator.value}".join(
-                [f"{filter_name} {comparer} @{param_name}"
-                 for (filter_name, value, comparer), param_name in zip(filters, parameters)]
-            )
+            if len(filters) == 1:
+                name_filter = "".join(
+                    [f"{filter_name} {comparer} @{param_name}"
+                    for (filter_name, value, comparer), param_name in zip(filters, parameters)]
+                )
+            elif join_operator is not None:
+                name_filter = f"{join_operator.value}".join(
+                    [f"{filter_name} {comparer} @{param_name}"
+                    for (filter_name, value, comparer), param_name in zip(filters, parameters)]
+                )
+            else:
+                raise EntityQueryException("Join operator must be specified when multiple filters are provided.")
 
             logger.info(
                 "Querying entities with custom filters",
@@ -391,15 +400,19 @@ class TableStorageService(TableServiceInterface):
                     "correlation_id": correlation_id
                 }
             )
+            effective_page_size = max_size if max_size else None
             print(f"Debug - filter query: {name_filter}, parameters: {parameters}")
             entities = self.table_client.query_entities(
                 query_filter=name_filter,
-                parameters=parameters
+                parameters=parameters,
+                results_per_page=effective_page_size
             )
 
             results = []
             async for entity in entities:
                 results.append(self._strip_metadata(dict(entity)))
+                if max_size and len(results) >= max_size:
+                    break
                 
             logger.info(
                 f"Custom filter query completed: {len(results)} entities found",

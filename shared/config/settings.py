@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     budget_analytics_table_name: str = "budgetanalytics"
     payment_items_table_name: str = "paymentitems"
     invoice_analytics_table_name: str = "invoiceanalytics"
+    dead_letter_table_name: str = "deadlettermessages"
+    out_box_queue_table_name: str = "outboxmessages"
 
     # Azure Document Intelligence
     document_intelligence_endpoint: str = ""
@@ -69,6 +71,8 @@ class Settings(BaseSettings):
     agent_poll_interval_seconds: int = 5
     agent_max_concurrent_messages: int = 10
     
+    payment_interval_seconds: int = 3600  # Run payment task every hour
+
     # Business Rules
     auto_approve_threshold: float = 1000.00  # Auto-approve invoices under this amount
     require_po_match: bool = True

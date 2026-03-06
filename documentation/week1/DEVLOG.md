@@ -420,3 +420,72 @@ kill_agent_mid_processing() → message_abandoned → retry_succeeds
 - ✅ **Blob Storage cost tracking dashboard available** ⭐
 
 ---
+
+## Week 6: Integration, Refinement & Production Prep
+**Goal:** Optimize performance, harden error handling, and prepare for production deployment
+
+### Key Deliverables
+- All agents fully integrated and communicating
+- Comprehensive error handling and retry logic
+- Admin panel for policy configuration
+- Performance optimization completed
+- Security hardening implemented
+- Production deployment plan
+
+### Tasks
+- Complete inter-agent communication testing
+  - Stress test with 1000+ invoices
+  - Test concurrent processing
+  - Verify message ordering (if needed)
+-  ✅ Implement comprehensive error handling
+  - Review all agents for error scenarios
+  - **Add blob upload/download retry logic** ⭐
+  - Create error recovery procedures
+- ✅ Set up dead letter queue monitoring
+
+- Implement retry strategies per agent
+
+- Build admin panel (web interface or API-based)
+  - Policy configuration UI
+  - Vendor management
+  - Budget allocation
+  - Manual invoice review queue
+  - Dead letter queue viewer
+  - Service Bus queue monitoring
+  - **Blob Storage browser/viewer** ⭐
+- Implement authentication and authorization (Azure AD)
+  - Secure API endpoints
+  - Role-based access control
+  - **Secure blob SAS token generation** ⭐
+- Performance optimization
+  - Query optimization for Azure Tables
+  - Service Bus throughput tuning (prefetch, batch processing)
+  - Agent processing time reduction
+  - **Blob Storage CDN integration (optional)** ⭐
+  - Parallel processing where possible
+- Load testing
+  - Simulate 1000+ invoices/hour
+  - Monitor Service Bus metrics
+  - **Monitor Blob Storage throughput** ⭐
+  - Identify bottlenecks
+- Add comprehensive logging and monitoring
+  - Structured logging (JSON)
+  - Application Insights integration
+  - Custom metrics and dashboards
+- Create operational dashboards in Azure Monitor
+  - Service Bus metrics
+  - Agent health metrics
+  - Processing time trends
+  - **Blob Storage metrics** ⭐
+- Security audit and hardening
+  - Penetration testing (basic)
+  - Dependency vulnerability scanning
+  - Network security review
+  - **Blob container access review** ⭐
+- **Prepare production deployment**
+  - Create Azure Container Registry
+  - Build Docker images for API and agents
+  - Create Kubernetes manifests (or ACI deployment specs)
+  - Set up production Service Bus namespace
+  - **Set up production Blob Storage with lifecycle policies** ⭐
+  - Configure production environment variables

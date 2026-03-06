@@ -16,7 +16,7 @@ from invoice_lifecycle_api.infrastructure.repositories.table_storage_service imp
 from shared.models.budget import BudgetStatus
 from shared.models.invoice import InvoiceState, ReviewStatus
 from shared.utils.constants import InvoiceSubjects, SubscriptionNames
-from shared.utils.exceptions import BudgetNotFoundException, InvoiceApprovalException, InvoiceNotFoundException, StorageException, VendorNotFoundException
+from shared.utils.exceptions import BudgetNotFoundException, InvoiceApprovalException, InvoiceNotFoundException, InvoiceProcessingException, StorageException, VendorNotFoundException
 
 class ApprovalAgent(BaseAgent):
     """
@@ -128,7 +128,7 @@ class ApprovalAgent(BaseAgent):
                                                                                  correlation_id)
             tasks = []
             if deterministic_decision.status == ApprovalStatus.REJECTED:
-                task = self._reject_invoice(invoice_data, InvoiceState.FAILED, deterministic_decision.reason)
+                task = self._reject_invoice(invoice_data, InvoiceState.FAILED, deterministic_decision.reason, correlation_id)
                 tasks.append(task)
             elif deterministic_decision.status == ApprovalStatus.MANUAL_APPROVAL_REQUIRED:
                 task = self._handle_manual_review(invoice_data, vendor_data, budget_data, correlation_id, deterministic_decision.reason)
@@ -248,7 +248,13 @@ class ApprovalAgent(BaseAgent):
                     }
                 )
 
-            await self.update_invoice(invoice_data)
+            await self.complete_processing(
+                invoice=invoice_data,
+                new_state=InvoiceState.PENDING_APPROVAL.value,
+                event_type=SubscriptionNames.APPROVAL_AGENT,
+                correlation_id=correlation_id
+                )
+            
             self.logger.info(
                 "Invoice required manual review",
                 extra={
@@ -285,12 +291,24 @@ class ApprovalAgent(BaseAgent):
                         "correlation_id": correlation_id
                     }
                 )
-                await self._approve_invoice(invoice_data, decision, approval_method="ai_warning")
+                await self._approve_invoice(
+                    invoice_data=invoice_data,
+                    decision=decision,
+                    approval_method="ai_warning",
+                    correlation_id=correlation_id
+                    )
             elif decision.status == ApprovalStatus.AI_ALERT:
                 invoice_data["errors"] = invoice_data.get("errors", []) + [decision.reason]
                 invoice_data["state"] = InvoiceState.MANUAL_REVIEW.value
                 invoice_data["rejection_reason"] = f"AI High Alert: {decision.reason}" 
-                await self.update_invoice(invoice_data)
+                
+                await self.complete_processing(
+                    invoice=invoice_data,
+                    new_state=InvoiceState.MANUAL_REVIEW.value,
+                    event_type=SubscriptionNames.APPROVAL_AGENT,
+                    correlation_id=correlation_id
+                    )                
+
                 self.logger.error(
                     "AI model returned alert for invoice approval decision",
                     extra={
@@ -302,9 +320,13 @@ class ApprovalAgent(BaseAgent):
                     }
                 )
             elif decision.status == ApprovalStatus.AI_PASSED:
-                await self._approve_invoice(invoice_data, 
-                                             vendor_data, budget_data,
-                                             decision, approval_method="ai_passed")
+                await self._approve_invoice( invoice_data= invoice_data, 
+                                             vendor_data= vendor_data, 
+                                             budget_data= budget_data,
+                                             decision= decision, 
+                                             approval_method="ai_passed",
+                                             correlation_id=correlation_id
+                                             )
                 self.logger.info(
                     "Invoice approved by AI decision",
                     extra={
@@ -316,7 +338,6 @@ class ApprovalAgent(BaseAgent):
                 )
 
             return "AI approval decision: " + decision.status
-        
         except Exception as e:
             raise InvoiceApprovalException(
                 f"Failed to handle auto-approved invoice {invoice_data.get('invoice_id')}: {str(e)}"
@@ -388,7 +409,10 @@ class ApprovalAgent(BaseAgent):
             )
 
 
-    async def _reject_invoice(self, invoice_data: Dict[str, Any], state: InvoiceState, reason: str) -> None:
+    async def _reject_invoice(self, invoice_data: Dict[str, Any], 
+                              state: InvoiceState, 
+                              reason: str,
+                              correlation_id: str) -> None:
         """Update invoice state to FAILED and save to storage."""
         try:
             invoice_data["state"] = state.value
@@ -397,8 +421,13 @@ class ApprovalAgent(BaseAgent):
             invoice_data["review_date"] = datetime.now(timezone.utc).isoformat()
             invoice_data["reviewed_by"] = "system"
 
+            await self.complete_processing(
+                invoice=invoice_data,
+                new_state=state.value,
+                event_type=SubscriptionNames.APPROVAL_AGENT,
+                correlation_id=correlation_id
+            )
 
-            await self.update_invoice(invoice_data)
             self.logger.info(
                 "Invoice Failed/Rejected",
                 extra={
@@ -417,7 +446,8 @@ class ApprovalAgent(BaseAgent):
                                vendor_data: Dict[str, Any],
                                budget_data: Dict[str, Any],
                                decision: ApprovalDecision,
-                               approval_method: str = "auto"
+                               approval_method: str = "auto",
+                                correlation_id: str = None
                                ) -> None:
         """Update invoice state to APPROVED and save to storage."""
         try:
@@ -432,11 +462,18 @@ class ApprovalAgent(BaseAgent):
                 due_days = 30
             elif invoice_data["approved_payment_terms"] == "NET_60":
                 due_days = 60
+            else:
+                due_days = 30  # Default to NET 30 if not specified
 
             invoice_data["due_date"] = datetime.now(timezone.utc) + timedelta(days=due_days)
 
-            await self.update_invoice(invoice_data)
-
+            await self.complete_processing(
+                invoice=invoice_data,
+                new_state=invoice_data["state"],
+                event_type=SubscriptionNames.APPROVAL_AGENT,
+                correlation_id=correlation_id
+                )
+            
             if self.alert_notification_system:
                 await self.alert_notification_system.send_alert(
                     invoice=invoice_data,
