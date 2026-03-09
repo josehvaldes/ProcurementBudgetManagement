@@ -37,27 +37,13 @@ class ApprovalAgent(BaseAgent):
             shutdown_event=shutdown_event
         )
 
-        self.vendor_table_client:Optional[TableStorageService] = None
-        self.budget_table_client:Optional[TableStorageService] = None
         self.alert_notification_system: Optional[ApprovalNotificationSystem] = None
         try:
-            self.vendor_table_client = TableStorageService(
-                storage_account_url=settings.table_storage_account_url,
-                table_name=settings.vendors_table_name
-            )
-            self.budget_table_client = TableStorageService(
-                storage_account_url=settings.table_storage_account_url,
-                table_name=settings.budgets_table_name
-            )
             self.alert_notification_system = ApprovalNotificationSystem()
             self.logger.info("Successfully initialized ApprovalAgent",
                              extra={
                                  "agent": self.agent_name,
-                                 "vendor_table": settings.vendors_table_name,
-                                 "budget_table": settings.budgets_table_name
                              })
-
-
         except Exception as e:
             self.logger.error(
                 "Failed to initialize ApprovalAgent",

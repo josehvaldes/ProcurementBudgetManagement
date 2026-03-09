@@ -153,15 +153,39 @@ class PaymentAgent(BaseAgent):
         """Helper method to process payment for an invoice."""
         try:
             payment_item["state"] = PaymentState.PROCESSED.value
-            await self.payment_batch_table_client.upsert_entity(payment_item,
-                                                                partition_key=payment_item["department_id"],
-                                                                row_key=payment_item["invoice_id"])
+            await self.payment_batch_table_client.upsert_entity(
+                payment_item,
+                partition_key=payment_item["department_id"],
+                row_key=payment_item["invoice_id"]
+            )
             await self.alert_notification_tool.send_payment_notification(
                 payment_item=payment_item
             )
             self.logger.info(f"Payment processed for invoice {payment_item['invoice_id']}")
         except Exception as e:
             self.logger.error(f"Error processing payment for invoice {payment_item['invoice_id']}", extra={"error": str(e)})
+            await self._trigger_compensation(payment_item)
+
+
+    async def _trigger_compensation(self , payment_item: Dict[str, Any]) -> None:
+        self.logger.info(f"Triggering compensation for failed payment of invoice {payment_item['invoice_id']}")
+        try:
+            self.publish_next_state(
+                invoice_id=payment_item["invoice_id"],
+                message_data={
+                    "department_id": payment_item["department_id"],
+                    "invoice_id": payment_item["invoice_id"],
+                    "amount": payment_item["amount"],
+                    "vendor_id": payment_item["vendor_id"],
+                    "currency": payment_item["currency"],
+                    "event_type": "PaymentAgentFailed",
+                    "subject": InvoiceSubjects.PAYMENT_FAILED,
+                "correlation_id": payment_item["correlation_id"],
+                "error": f"Payment processing failed for invoice {payment_item['invoice_id']}"
+            }
+        )
+        except Exception as e:
+            self.logger.error(f"Error triggering compensation for invoice {payment_item['invoice_id']}", extra={"error": str(e)})
 
     @traceable(name="payment_agent.process_invoice", tags=["payment", "agent"], metadata={"version": "1.0"})
     async def process_invoice(self, message_data: Dict[str, Any]) -> Dict[str, Any]:

@@ -16,20 +16,18 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 
 from langsmith import traceable
-
+from shared.config.settings import settings
 from agents.base_agent import BaseAgent
 from agents.budget_agent.tools.alert_notification_system import AlertNotificationSystem
 from agents.budget_agent.tools.budget_analytics_agent import BudgetAnalyticsAgent, BudgetAnalyticsOutcome
 from agents.budget_agent.tools.budget_classification_agent import BudgetClassificationAgent
-from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
-from shared.config.settings import settings
+from shared.models.budget import Budget
 from shared.models.invoice import InvoiceInternalMessage, InvoiceState
 from shared.utils.constants import AgentNames, CompoundKeyStructure, InvoiceSubjects, SubscriptionNames
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
     BudgetException,
     InvoiceProcessingException,
-    ProcurementException,
     StorageException
 )
 
@@ -48,7 +46,6 @@ class BudgetAgent(BaseAgent):
     
     Attributes:
         agent_name (str): Agent identifier
-        budget_table_client (TableStorageService): Budget repository
         budget_classification_agent (BudgetClassificationAgent): AI classifier
         budget_analytics_agent (BudgetAnalyticsAgent): Analytics and anomaly detection
         alert_notification_system (AlertNotificationSystem): Alert sender
@@ -63,21 +60,15 @@ class BudgetAgent(BaseAgent):
         """
         super().__init__(
             agent_name=AgentNames.BUDGET_AGENT,
-            subscription_name=SubscriptionNames.BUDGET_AGENT,
+            subscription_name=[SubscriptionNames.BUDGET_AGENT, SubscriptionNames.BUDGET_COMPENSATION],
             shutdown_event=shutdown_event or asyncio.Event()
         )
 
-        self.budget_table_client: Optional[TableStorageService] = None
         self.budget_classification_agent: Optional[BudgetClassificationAgent] = None
         self.budget_analytics_agent: Optional[BudgetAnalyticsAgent] = None
         self.alert_notification_system: Optional[AlertNotificationSystem] = None
 
         try:
-            # Initialize budget repository
-            self.budget_table_client = TableStorageService(
-                storage_account_url=settings.table_storage_account_url,
-                table_name=settings.budgets_table_name
-            )
 
             # Initialize AI-powered tools
             self.budget_classification_agent = BudgetClassificationAgent()
@@ -89,7 +80,6 @@ class BudgetAgent(BaseAgent):
                 extra={
                     "agent_name": self.agent_name,
                     "subscription": SubscriptionNames.BUDGET_AGENT,
-                    "budget_table": settings.budgets_table_name
                 }
             )
         except Exception as e:
@@ -115,15 +105,6 @@ class BudgetAgent(BaseAgent):
         cleanup_errors = []
         
         # Close budget table client
-        if self.budget_table_client:
-            try:
-                await self.budget_table_client.close()
-                self.logger.debug("Budget table client closed successfully")
-            except Exception as e:
-                error_msg = f"Error closing budget table client: {str(e)}"
-                self.logger.warning(error_msg, exc_info=True)
-                cleanup_errors.append(error_msg)
-        
         # Close AI agents (if they have resources)
         for agent_name, agent in [
             ("budget_classification_agent", self.budget_classification_agent),
@@ -153,6 +134,126 @@ class BudgetAgent(BaseAgent):
         metadata={"version": "1.0", "agent": "BudgetAgent"}
     )
     async def process_invoice(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        subject = message_data.get("subject")
+        if subject == InvoiceSubjects.VALIDATED:
+            return await self._process_invoice_validated(message_data)
+        if subject == InvoiceSubjects.PAYMENT_FAILED:
+            return await self._process_budget_compensation(message_data)
+    
+    async def _process_budget_compensation(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        invoice_id = message_data.get("invoice_id")
+        department_id = message_data.get("department_id")
+        correlation_id = message_data.get("correlation_id", invoice_id)
+        
+        if not invoice_id or not department_id:
+            raise ValueError("invoice_id and department_id are required in message_data")
+
+        self.logger.info(
+            "Processing budget compensation",
+            extra={
+                "invoice_id": invoice_id,
+                "department_id": department_id,
+                "correlation_id": correlation_id,
+                "agent": self.agent_name
+            }
+        )
+        try:
+            invoice_data = await self._retrieve_invoice(
+                department_id=department_id,
+                invoice_id=invoice_id,
+                correlation_id=correlation_id
+            )
+
+            budget_data = await self.retrieve_budget_metadata(
+                invoice_data=invoice_data,
+                correlation_id=correlation_id
+            )
+            amount = invoice_data.get("amount", 0)
+
+            await self._compensate_budget(
+                invoice_data=invoice_data,
+                budget_data=budget_data,
+                amount=amount,
+                correlation_id=correlation_id
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f"Error processing budget compensation for invoice {invoice_id}: {str(e)}",
+                extra={
+                    "invoice_id": invoice_id,
+                    "department_id": department_id,
+                    "correlation_id": correlation_id,
+                    "error_type": type(e).__name__,
+                },
+                exc_info=True
+            )
+            raise BudgetException(
+                f"Failed to process budget compensation for invoice {invoice_id}: {str(e)}"
+            ) from e
+
+        # compensation agent doesn't publish next state as payment failure is a terminal state for the invoice.
+        return None
+    
+    async def _compensate_budget(self, invoice_data: Dict[str, Any], budget_data: Dict[str, Any], amount: float, correlation_id: str) -> None:
+        
+        self.logger.info(
+                "Budget compensation completed successfully",
+                extra={
+                    "invoice_id": invoice_data.get("invoice_id"),
+                    "compensated_amount": amount,
+                    "correlation_id": correlation_id
+                }
+            )
+        
+        try:            
+            # Build compensation details
+            budget: Budget = Budget.from_dict(budget_data)
+            reserved = budget.reserved_amount
+            if reserved >= amount:
+                budget.reserved_amount = reserved - amount
+                # recalculate budget metrics after compensation
+                budget.calculate_metrics()
+
+            else:
+                raise BudgetException(
+                    f"Insufficient reserved budget  "
+                    f"Reserved: {reserved}, Required: {amount}"
+                )
+
+            message = (f"Budget compensated for payment failure of invoice {invoice_data.get('invoice_id')}. "
+                                     f"Original reserved amount: {reserved}, "
+                                     f"New reserved amount: {budget.reserved_amount}, "
+                                     f"New consumed amount: {budget.consumed_amount}")
+
+            # Send alert
+            approver_email = budget.approver_email or settings.default_finance_approver_email
+            await self.alert_notification_system.send_alert(
+                    approver_email=approver_email,
+                    subject="alert_subject_budget_compensation",
+                    message=message
+                )
+            alert_summary = f"Budget compensation alert sent to {approver_email} for invoice {invoice_data.get('invoice_id')}"
+            budget.alerts_sent.append(alert_summary)
+            self.budget_table.upsert_entity(budget.to_dict())
+        except BudgetException as e:
+            self.logger.error(
+                f"Budget exception occurred: {str(e)}",
+                extra={
+                    "invoice_id": invoice_data.get("invoice_id"),
+                    "budget": budget_data.get("budget_id"),
+                    "correlation_id": correlation_id,
+                    "error_type": type(e).__name__,
+                },
+                exc_info=True
+            )
+            raise
+        except Exception as e:
+            raise BudgetException(
+                f"Failed to compensate budget: {str(e)}"
+            ) from e
+
+    async def _process_invoice_validated(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Check budget availability and allocate invoice to budget.
         
@@ -548,8 +649,8 @@ class BudgetAgent(BaseAgent):
                 ("PartitionKey", budget_year),
                 ("RowKey", compound_key),
             ]
-            
-            budgets = await self.budget_table_client.query_entities(
+            # use budget_table from BaseAgent which is initialized with the correct table name
+            budgets = await self.budget_table.query_entities(
                 filters_query=budget_filters
             )
             

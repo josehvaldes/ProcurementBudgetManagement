@@ -26,6 +26,7 @@ class PaymentBatchItem:
     state: PaymentState
     created_at: datetime
     updated_at: datetime
+    correlation_id: str
 
     def to_dict(self) -> dict:
         """Convert Invoice dataclass to dictionary."""

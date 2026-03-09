@@ -16,7 +16,7 @@ class ApprovalService:
                  invoice_repository: TableServiceInterface,
                  budget_repository: TableServiceInterface = None
                  ):
-        self.repository = invoice_repository
+        self.invoice_repository = invoice_repository
         self.budget_repository = budget_repository
         logger.info("ApprovalService initialized with repository", 
                     extra={"repository_type": type(invoice_repository).__name__}
@@ -30,7 +30,7 @@ class ApprovalService:
                 ( "partitionkey", partition_key, CompareOperator.EQUAL.value ),
                 ( "state", InvoiceState.PENDING_APPROVAL.value, CompareOperator.EQUAL.value )
             ]
-            pending_approvals = await self.repository.query_entities_with_filters(filters = filters, join_operator=JoinOperator.AND)
+            pending_approvals = await self.invoice_repository.query_entities_with_filters(filters = filters, join_operator=JoinOperator.AND)
             return pending_approvals
         except EntityQueryException as e:
             logger.error("Error querying pending approvals", extra={"error": str(e)})
@@ -38,12 +38,12 @@ class ApprovalService:
 
     async def approve_invoice(self, department_id: str, invoice_id: str, approver_name: str) -> dict:
         try:
-            invoice_entity = await self.repository.get_entity(partition_key=department_id, row_key=invoice_id)
+            invoice_entity = await self.invoice_repository.get_entity(partition_key=department_id, row_key=invoice_id)
             invoice_entity["state"] = InvoiceState.APPROVED.value
             invoice_entity["reviewed_date"] = datetime.now(timezone.utc).isoformat()
             invoice_entity["reviewed_by"] = approver_name
             invoice_entity["review_status"] = ReviewStatus.APPROVED.value
-            await self.repository.upsert_entity(invoice_entity)
+            await self.invoice_repository.upsert_entity(invoice_entity)
             return invoice_entity
         except EntityQueryException as e:
             logger.error("Error approving invoice", extra={"error": str(e), "invoice_id": invoice_id})
@@ -51,13 +51,13 @@ class ApprovalService:
 
     async def reject_invoice(self, department_id: str, invoice_id: str, approver_name: str, rejection_reason: str) -> dict:
         try:
-            invoice_entity = await self.repository.get_entity(partition_key=department_id, row_key=invoice_id)
+            invoice_entity = await self.invoice_repository.get_entity(partition_key=department_id, row_key=invoice_id)
             invoice_entity["state"] = InvoiceState.REJECTED.value
             invoice_entity["reviewed_date"] = datetime.now(timezone.utc).isoformat()
             invoice_entity["reviewed_by"] = approver_name
             invoice_entity["review_status"] = ReviewStatus.REJECTED.value
             invoice_entity["rejection_reason"] = rejection_reason
-            await self.repository.upsert_entity(invoice_entity)
+            await self.invoice_repository.upsert_entity(invoice_entity)
             return invoice_entity
         except EntityQueryException as e:
             logger.error("Error rejecting invoice", extra={"error": str(e), "invoice_id": invoice_id})

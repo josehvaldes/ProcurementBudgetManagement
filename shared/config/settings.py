@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     outbox_poll_interval_seconds: int = 10
     outbox_max_batch_size: int = 10
     
+
+    default_finance_approver_email: str = "approver@example.com"
+
     model_config = ConfigDict(
         str_max_length=200,
         env_file=".env",

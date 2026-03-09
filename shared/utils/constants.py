@@ -16,7 +16,7 @@ class InvoiceSubjects:
     PAID = "invoice.paid"
     FAILED = "invoice.failed"
     MANUAL_REVIEW = "invoice.manual_review"
-
+    PAYMENT_FAILED = "invoice.payment_failed"
 
 class TABLE_NAMES:
     """Azure Table Storage table names."""
@@ -57,6 +57,7 @@ class SubscriptionNames:
     APPROVAL_AGENT = "approval-agent-subscription"
     PAYMENT_AGENT = "payment-agent-subscription"
     ANALYTICS_AGENT = "analytics-agent-subscription"
+    BUDGET_COMPENSATION = "budget-compensation-subscription"
 
 
 # Agent message filters (SQL filter expressions)
@@ -68,6 +69,7 @@ class AgentFilters:
     APPROVAL = f"subject = '{InvoiceSubjects.BUDGET_CHECKED}'"
     PAYMENT = f"subject = '{InvoiceSubjects.APPROVED}'"
     ANALYTICS = "1=1"  # Receives all messages
+    BUDGET_COMPENSATION = f"subject = '{InvoiceSubjects.PAYMENT_FAILED}'"
 
 
 class CompoundKeyStructure(str, Enum):

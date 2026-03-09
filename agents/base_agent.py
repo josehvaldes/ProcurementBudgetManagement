@@ -98,7 +98,7 @@ class BaseAgent(ABC):
     def __init__(
         self,
         agent_name: str,
-        subscription_name: str,
+        subscription_name: str|list[str],
         shutdown_event: Optional[asyncio.Event] = None
     ):
         """
@@ -261,6 +261,15 @@ class BaseAgent(ABC):
         self.logger.debug("Signal handlers registered successfully")
     
     async def run(self) -> None:
+        if isinstance(self.subscription_name, str):
+            await self._run_subscription_receiver(self.subscription_name)
+        elif isinstance(self.subscription_name, list):
+            # Run multiple subscription receivers concurrently
+            await asyncio.gather(*[
+                self._run_subscription_receiver(sub) for sub in self.subscription_name
+            ])
+
+    async def _run_subscription_receiver(self, subscription:str) -> None:
         """
         Main agent run loop - continuously processes messages until shutdown.
         
@@ -283,14 +292,14 @@ class BaseAgent(ABC):
             f"Starting {self.agent_name} run loop",
             extra={
                 "agent_name": self.agent_name,
-                "subscription": self.subscription_name,
+                "subscription": subscription,
                 "topic": self.topic_name
             }
         )
         
         try:
             async with self.service_bus_client.get_subscription_receiver(
-                subscription=self.subscription_name,
+                subscription=subscription,
                 shutdown_event=self.shutdown_event
             ) as receiver:
                 
@@ -298,7 +307,7 @@ class BaseAgent(ABC):
                     f"{self.agent_name} listening for messages",
                     extra={
                         "agent_name": self.agent_name,
-                        "subscription": self.subscription_name
+                        "subscription": subscription
                     }
                 )
                 
@@ -606,10 +615,10 @@ class BaseAgent(ABC):
                 failure_description=str(e)
             )
     
-    async def _publish_next_state(
+    async def publish_next_state(
         self,
         invoice_id: str,
-        processing_result: Dict[str, Any]
+        message_data: Dict[str, Any]
     ) -> None:
         """
         Publish message for next processing stage.
@@ -621,8 +630,8 @@ class BaseAgent(ABC):
         Raises:
             MessagingException: If message publishing fails
         """
-        next_subject = self.get_next_subject()
-        correlation_id = processing_result.get("correlation_id", invoice_id)
+        next_subject = message_data.get("subject")
+        correlation_id = message_data.get("correlation_id", invoice_id)
         
         if not next_subject:
             self.logger.debug(
@@ -638,7 +647,7 @@ class BaseAgent(ABC):
         try:
             message_payload = {
                 "subject": next_subject,
-                "body": processing_result
+                "body": message_data
             }
             
             await self.service_bus_client.publish_message(
@@ -874,7 +883,7 @@ class BaseAgent(ABC):
                     "row_key": row_key
                 }
             )
-            entity_id = await self.outbox_table.upsert_entity(
+            _ = await self.outbox_table.upsert_entity(
                 entity=entity,
                 partition_key=partition_key,
                 row_key=row_key

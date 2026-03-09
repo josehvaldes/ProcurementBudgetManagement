@@ -22,8 +22,6 @@ from shared.utils.constants import AgentNames, InvoiceSubjects, SubscriptionName
 from shared.config.settings import settings
 from shared.utils.exceptions import (
     InvoiceNotFoundException,
-    InvoiceProcessingException,
-    ProcurementException,
     ValidationException,
     StorageException
 )
@@ -40,7 +38,6 @@ class ValidationAgent(BaseAgent):
     
     Attributes:
         agent_name (str): Agent identifier
-        vendor_table_client (TableStorageService): Vendor repository
         deterministic_validation_tool (DeterministicValidator): Rule-based validator
         ai_validator (AgenticValidator): AI-powered validator
     """
@@ -58,20 +55,14 @@ class ValidationAgent(BaseAgent):
             shutdown_event=shutdown_event or asyncio.Event()
         )
 
-        self.vendor_table_client: Optional[TableStorageService] = None
         self.deterministic_validation_tool: Optional[DeterministicValidator] = None
         self.ai_validator: Optional[AgenticValidator] = None
 
         try:
-            # Initialize vendor repository
-            self.vendor_table_client = TableStorageService(
-                storage_account_url=settings.table_storage_account_url,
-                table_name=settings.vendors_table_name
-            )
 
-            # Initialize validation tools
+            # Initialize validation tools with vendor_table from BaseAgent which is set up with the correct table name
             self.deterministic_validation_tool = DeterministicValidator(
-                vendor_table=self.vendor_table_client,
+                vendor_table=self.vendor_table,
                 invoice_table=self.invoice_table
             )
 
@@ -106,16 +97,6 @@ class ValidationAgent(BaseAgent):
         )
         
         cleanup_errors = []
-        
-        # Close vendor table client
-        if self.vendor_table_client:
-            try:
-                await self.vendor_table_client.close()
-                self.logger.debug("Vendor table client closed successfully")
-            except Exception as e:
-                error_msg = f"Error closing vendor table client: {str(e)}"
-                self.logger.warning(error_msg, exc_info=True)
-                cleanup_errors.append(error_msg)
         
         # Close AI validator (if it has resources)
         if self.ai_validator:
