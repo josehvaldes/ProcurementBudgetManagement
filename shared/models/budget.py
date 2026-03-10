@@ -90,6 +90,7 @@ class Budget:
     notes: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     status: BudgetStatus = BudgetStatus.ACTIVE
+    log: List[str] = field(default_factory=list)  # Change history log
     
     def calculate_metrics(self) -> None:
         """Calculate budget metrics."""

@@ -14,7 +14,7 @@ from agents.approval_agent.tools.approval_status import ApprovalDecision, Approv
 from shared.models.budget import Budget, BudgetStatus
 from shared.models.invoice import InvoiceState, ReviewStatus
 from shared.utils.constants import AgentNames, InvoiceSubjects, SubscriptionNames
-from shared.utils.exceptions import BudgetNotFoundException, InvoiceApprovalException, InvoiceNotFoundException, InvoiceProcessingException, StorageException, VendorNotFoundException
+from shared.utils.exceptions import BudgetNotFoundException, BudgetUpdateException, InvoiceApprovalException, InvoiceNotFoundException, InvoiceProcessingException, StorageException, VendorNotFoundException
 
 class ApprovalAgent(BaseAgent):
     """
@@ -476,9 +476,72 @@ class ApprovalAgent(BaseAgent):
                     "correlation_id": invoice_data.get("correlation_id")
                 }
             )
+        except InvoiceProcessingException as e:
+            self.logger.error(
+                f"Invoice processing failed during approval of invoice {invoice_data.get('invoice_id')}",
+                extra={
+                    "invoice_id": invoice_data.get("invoice_id"),
+                    "correlation_id": correlation_id,
+                    "error_type": type(e).__name__,
+                    "error_details": str(e)
+                },
+                exc_info=True
+            )
+            # complete processing with failed state
+            # compensate budget reservation if invoice processing fails after approval
+            try:
+                await self._compensate_budget_reservation(invoice_data, budget_data, correlation_id)
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to compensate budget reservation for invoice {invoice_data.get('invoice_id')}",
+                    extra={
+                        "invoice_id": invoice_data.get("invoice_id"),
+                        "correlation_id": correlation_id,
+                        "error_type": type(e).__name__,
+                        "error_details": str(e)
+                    },
+                    exc_info=True
+                )
+
         except Exception as e:
             raise InvoiceApprovalException(
                 f"Failed to approve invoice {invoice_data.get('invoice_id')}: {str(e)}"
+            ) from e
+
+    async def _compensate_budget_reservation(self, invoice_data: Dict[str, Any], budget_data: Dict[str, Any], correlation_id: str) -> None:
+        """Compensate budget reservation for failed invoice processing."""
+        try:
+            # Placeholder for actual budget compensation logic
+            self.logger.info(
+                "Compensating budget reservation for failed invoice processing",
+                extra={
+                    "invoice_id": invoice_data.get("invoice_id"),
+                    "budget_id": budget_data.get("budget_id"),
+                    "amount": invoice_data.get("amount"),
+                    "correlation_id": correlation_id
+                }
+            )
+            budget:Budget = Budget.from_dict(budget_data)
+            budget.reserved_amount = max(0, budget.reserved_amount - invoice_data.get("amount", 0))
+            now = datetime.now(timezone.utc)
+            budget.last_invoice_date = now
+            budget.last_update_by = AgentNames.APPROVAL_AGENT
+            budget.log.append(f"{now.isoformat()}: Compensated after failure '{invoice_data.get('amount', 0)}' for invoice '{invoice_data.get('invoice_id')}' by '{AgentNames.APPROVAL_AGENT}'")
+
+            budget.calculate_metrics()
+            await self.update_budget(budget, correlation_id)
+            self.logger.info(
+                "Budget reservation compensated successfully",
+                extra={
+                    "invoice_id": invoice_data.get("invoice_id"),
+                    "budget_id": budget_data.get("budget_id"),
+                    "amount": invoice_data.get("amount"),
+                    "correlation_id": correlation_id
+                }
+            )
+        except Exception as e:
+            raise BudgetUpdateException(
+                f"Failed to compensate budget reservation for invoice {invoice_data.get('invoice_id')}: {str(e)}"
             ) from e
 
     async def _reserve_budget(self, invoice_data: Dict[str, Any], budget_data: Dict[str, Any], correlation_id: str) -> None:
@@ -496,6 +559,10 @@ class ApprovalAgent(BaseAgent):
             )
             budget:Budget = Budget.from_dict(budget_data)
             budget.reserved_amount = budget.reserved_amount + invoice_data.get("amount", 0)
+            now = datetime.now(timezone.utc)
+            budget.last_invoice_date = now
+            budget.last_update_by = AgentNames.APPROVAL_AGENT
+            budget.log.append(f"{now.isoformat()}: Reserved {invoice_data.get('amount', 0)} for invoice '{invoice_data.get('invoice_id')}' by '{AgentNames.APPROVAL_AGENT}'")
             budget.calculate_metrics()
             await self.update_budget(budget, correlation_id)
             self.logger.info(

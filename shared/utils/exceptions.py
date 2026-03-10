@@ -99,6 +99,10 @@ class BudgetNotFoundException(BudgetServiceException):
     """Exception raised when a budget is not found."""
     pass
 
+class BudgetUpdateException(BudgetServiceException):
+    """Exception raised when budget update fails."""
+    pass
+
 # Approval Agent specific exceptions
 
 class InvoiceApprovalException(ProcurementException):
