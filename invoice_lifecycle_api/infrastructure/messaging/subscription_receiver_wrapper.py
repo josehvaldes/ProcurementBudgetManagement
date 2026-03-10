@@ -67,7 +67,7 @@ class SubscriptionReceiverWrapper:
                     return messages[0]
                 else:
                     # No messages available, keep iterating
-                    print(f"No messages available, keep iterating. Shutdown_event: {self.shutdown_event.is_set()}")
+                    print(f"No messages available for '{self.subscription}', keep iterating. Shutdown_event: {self.shutdown_event.is_set()}")
                     await asyncio.sleep(0.1)  # Wait before retrying
                     
             # If we exit the loop, stop iteration

@@ -261,10 +261,21 @@ class BaseAgent(ABC):
         self.logger.debug("Signal handlers registered successfully")
     
     async def run(self) -> None:
+        """
+        Start the agent's main processing loop.
+        """
         if isinstance(self.subscription_name, str):
+            self.logger.info(
+                f"Starting {self.agent_name} run loop for subscription: {self.subscription_name}",
+                extra={"agent_name": self.agent_name}
+            )
             await self._run_subscription_receiver(self.subscription_name)
         elif isinstance(self.subscription_name, list):
             # Run multiple subscription receivers concurrently
+            self.logger.info(
+                f"Starting {self.agent_name} run loop for multiple subscriptions",
+                extra={"agent_name": self.agent_name}
+            )
             await asyncio.gather(*[
                 self._run_subscription_receiver(sub) for sub in self.subscription_name
             ])
@@ -800,6 +811,41 @@ class BaseAgent(ABC):
             )
             raise StorageException(error_msg) from e
     
+    async def update_budget(self, budget: Dict[str, Any], correlation_id: str) -> None:
+        """Update budget in Table Storage."""
+        row_key = budget.get("compound_key")
+        partition_key = budget.get("fiscal_year")
+        if not row_key:
+            raise ValueError("Budget must contain 'compound_key' field")
+
+        try:
+            _ = await self.budget_table.upsert_entity(
+                entity=budget,
+                partition_key=partition_key,
+                row_key=row_key
+            )
+            self.logger.debug(
+                "Budget updated in storage",
+                extra={
+                    "agent_name": self.agent_name,
+                    "row_key": row_key,
+                    "correlation_id": correlation_id
+                }
+            )
+        except Exception as e:
+            error_msg = f"Failed to update budget in storage: {str(e)}"
+            self.logger.error(
+                error_msg,
+                exc_info=True,
+                extra={
+                    "agent_name": self.agent_name,
+                    "row_key": row_key,
+                    "correlation_id": correlation_id,
+                    "error_type": type(e).__name__
+                }
+            )
+            raise StorageException(error_msg) from e
+
     async def update_invoice(
         self,
         invoice: Dict[str, Any]

@@ -7,13 +7,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 from langsmith import traceable
-from shared.config.settings import settings
 from agents.base_agent import BaseAgent
 from agents.approval_agent.tools.approval_analytics_agent import ApprovalAnalyticsAgent, ApprovalAnalyticsOutcome
 from agents.approval_agent.tools.approval_notification_system import ApprovalNotificationSystem
 from agents.approval_agent.tools.approval_status import ApprovalDecision, ApprovalStatus
-from invoice_lifecycle_api.infrastructure.repositories.table_storage_service import TableStorageService
-from shared.models.budget import BudgetStatus
+from shared.models.budget import Budget, BudgetStatus
 from shared.models.invoice import InvoiceState, ReviewStatus
 from shared.utils.constants import AgentNames, InvoiceSubjects, SubscriptionNames
 from shared.utils.exceptions import BudgetNotFoundException, InvoiceApprovalException, InvoiceNotFoundException, InvoiceProcessingException, StorageException, VendorNotFoundException
@@ -453,6 +451,9 @@ class ApprovalAgent(BaseAgent):
 
             invoice_data["due_date"] = datetime.now(timezone.utc) + timedelta(days=due_days)
 
+            # Reserve budget for approved invoice
+            await self._reserve_budget(invoice_data, budget_data, correlation_id)
+
             await self.complete_processing(
                 invoice=invoice_data,
                 new_state=invoice_data["state"],
@@ -478,6 +479,37 @@ class ApprovalAgent(BaseAgent):
         except Exception as e:
             raise InvoiceApprovalException(
                 f"Failed to approve invoice {invoice_data.get('invoice_id')}: {str(e)}"
+            ) from e
+
+    async def _reserve_budget(self, invoice_data: Dict[str, Any], budget_data: Dict[str, Any], correlation_id: str) -> None:
+        """Reserve budget for approved invoice."""
+        try:
+            # Placeholder for actual budget reservation logic
+            self.logger.info(
+                "Reserving budget for approved invoice",
+                extra={
+                    "invoice_id": invoice_data.get("invoice_id"),
+                    "budget_id": budget_data.get("budget_id"),
+                    "amount": invoice_data.get("amount"),
+                    "correlation_id": correlation_id
+                }
+            )
+            budget:Budget = Budget.from_dict(budget_data)
+            budget.reserved_amount = budget.reserved_amount + invoice_data.get("amount", 0)
+            budget.calculate_metrics()
+            await self.update_budget(budget, correlation_id)
+            self.logger.info(
+                "Budget reserved successfully for approved invoice",
+                extra={
+                    "invoice_id": invoice_data.get("invoice_id"),
+                    "budget_id": budget_data.get("budget_id"),
+                    "amount": invoice_data.get("amount"),
+                    "correlation_id": correlation_id
+                }
+            )
+        except Exception as e:
+            raise BudgetUpdateException(
+                f"Failed to reserve budget for invoice {invoice_data.get('invoice_id')}: {str(e)}"
             ) from e
 
     async def _retrieve_invoice_metadata(self, 
