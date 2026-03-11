@@ -1,16 +1,44 @@
 """
 Azure Document Intelligence client wrapper for OCR and document extraction.
 """
-
+import pybreaker
 import logging
 from threading import RLock
 from typing import Dict, Any
+from azure.core.exceptions import HttpResponseError
 from azure.ai.documentintelligence.aio import DocumentIntelligenceClient
 from azure.ai.documentintelligence.models import AnalyzeDocumentRequest, DocumentAnalysisFeature, AnalyzeResult
+
 
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 
 logger = logging.getLogger(__name__)
+
+class DocumentIntelligenceBreakerListener(pybreaker.CircuitBreakerListener):
+    """Listener to log circuit breaker state changes."""
+
+    def state_change(self, cb, old_state, new_state):
+        logger.warning(
+            f"Circuit breaker '{cb.name}' state changed: {old_state.name} → {new_state.name}"
+        )
+
+    def failure(self, cb, exc):
+        logger.warning(f"Circuit breaker '{cb.name}' recorded failure: {exc}")
+
+    def success(self, cb):
+        logger.info(f"Circuit breaker '{cb.name}' recorded success")
+
+
+doc_intelligence_breaker = pybreaker.CircuitBreaker(
+    fail_max=3,
+    reset_timeout=30,
+    name="document-intelligence-breaker",
+    listeners=[DocumentIntelligenceBreakerListener()],
+    exclude=[
+        ValueError, 
+        TypeError,
+    ],
+)
 
 
 class DocumentIntelligenceWrapper:
@@ -52,6 +80,7 @@ class DocumentIntelligenceWrapper:
             await self.client.close()
             logger.info("Document Intelligence client closed.")
 
+    @doc_intelligence_breaker
     async def analyze_invoice(self, document_data: bytes, locale: str = "en-US", additional_fields:list[str] = [] ) -> list[Dict[str, Any]]:
         """
         Analyze an invoice document using the prebuilt invoice model.
@@ -83,6 +112,9 @@ class DocumentIntelligenceWrapper:
 
             result = poller.result()
             return self._extract_invoice_data(result, additional_fields)
+        except HttpResponseError as e:
+            logger.error(f"HTTP error during receipt analysis: {e.status_code} - {e.message}")
+            raise
         except Exception as e:
             logger.error(f"Failed to analyze invoice from bytes: {e}")
             raise
@@ -177,7 +209,7 @@ class DocumentIntelligenceWrapper:
         
         return document_list
 
-
+    @doc_intelligence_breaker
     async def analyze_receipt(self, document_data: bytes, locale: str = "en-US", additional_fields:list[str] = [] ) -> list[Dict[str, Any]]:
         """
         Analyze a receipt document using the prebuilt receipt model.
@@ -213,7 +245,9 @@ class DocumentIntelligenceWrapper:
             receipt_data = self._extract_receipt_data(result, additional_fields)
             logger.info("Receipt analysis completed successfully")
             return receipt_data
-            
+        except HttpResponseError as e:
+            logger.error(f"HTTP error during receipt analysis: {e.status_code} - {e.message}")
+            raise
         except Exception as e:
             logger.error(f"Failed to analyze receipt: {e}")
             raise

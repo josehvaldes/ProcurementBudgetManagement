@@ -13,6 +13,8 @@ import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 
+import pybreaker
+
 from agents.base_agent import BaseAgent
 from agents.intake_agent.tools.invoice_analyzer_tool import InvoiceAnalyzerTool
 from agents.intake_agent.tools.qr_extractor import get_qr_info_from_bytes
@@ -462,7 +464,20 @@ class IntakeAgent(BaseAgent):
             )
             
             return extracted_data
-            
+        except pybreaker.CircuitBreakerError:
+            self.logger.error(
+                f"Document Intelligence service is currently unavailable (circuit breaker open)",
+                extra={
+                    "invoice_id": invoice_id,
+                    "document_type": document_type,
+                    "correlation_id": correlation_id,
+                    "error_type": "CircuitBreakerOpen"
+                },
+                exc_info=True
+            )
+            raise DocumentExtractionException(
+                f"Document Intelligence service is currently unavailable. Please try again later."
+            )            
         except Exception as e:
             raise DocumentExtractionException(
                 f"Failed to extract data from {document_type}: {str(e)}"
