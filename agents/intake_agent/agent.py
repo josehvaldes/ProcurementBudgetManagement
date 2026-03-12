@@ -402,6 +402,20 @@ class IntakeAgent(BaseAgent):
             
         except StorageException:
             raise
+        except pybreaker.CircuitBreakerError:
+            self.logger.error(
+                f"Blob storage service is currently unavailable (circuit breaker open)",
+                extra={
+                    "invoice_id": invoice_id,
+                    "blob_name": blob_name,
+                    "correlation_id": correlation_id,
+                    "error_type": "CircuitBreakerOpen"
+                },
+                exc_info=True
+            )
+            raise StorageException(
+                f"Blob storage service is currently unavailable. Please try again later."
+            )
         except Exception as e:
             raise StorageException(
                 f"Failed to download document from blob storage: {str(e)}"

@@ -1,12 +1,45 @@
 
 import io
 from azure.storage.blob.aio import BlobServiceClient
+import pybreaker
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
 from invoice_lifecycle_api.application.interfaces.service_interfaces import StorageServiceInterface
 
 logger = get_logger(__name__)
+
+class InvoiceStorageBreakerListener(pybreaker.CircuitBreakerListener):
+    """Listener to log circuit breaker state changes."""
+
+    def state_change(self, cb, old_state, new_state):
+        logger.warning(
+            f"Circuit breaker '{cb.name}' state changed: {old_state.name} → {new_state.name}"
+        )
+
+    def failure(self, cb, exc):
+        logger.warning(f"Circuit breaker '{cb.name}' recorded failure: {exc}")
+
+    def success(self, cb):
+        logger.info(f"Circuit breaker '{cb.name}' recorded success")
+
+download_circuit_breaker = pybreaker.CircuitBreaker(
+    fail_max=5,
+    reset_timeout=60,
+    listener=InvoiceStorageBreakerListener(),
+    exclude=[FileNotFoundError,  # Exclude FileNotFoundError from tripping the circuit breaker
+             ValueError,
+             TypeError] 
+)
+
+command_circuit_breaker = pybreaker.CircuitBreaker(
+    fail_max=5,
+    reset_timeout=60,
+    listener=InvoiceStorageBreakerListener(),
+    exclude=[FileNotFoundError,
+             ValueError,
+             TypeError]
+)
 
 class InvoiceStorageService(StorageServiceInterface):
 
@@ -22,6 +55,7 @@ class InvoiceStorageService(StorageServiceInterface):
 
         self.container_client = self.blob_service_client.get_container_client(container=self.container_name)
 
+    @download_circuit_breaker
     async def upload_file_as_bytes(self, blob_bytes: bytes, blob_name: str) -> str:
         """Upload file bytes to storage and return the file URL."""
         
@@ -38,6 +72,7 @@ class InvoiceStorageService(StorageServiceInterface):
         """Upload file to storage and return the file URL."""
         pass
 
+    @download_circuit_breaker
     async def download_file(self,  container_name:str, blob_name: str) -> bytes:
         """Download file from storage"""
         blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=blob_name)
@@ -46,11 +81,13 @@ class InvoiceStorageService(StorageServiceInterface):
         _ = await data.readinto(stream)
         return stream.getvalue()
 
+    @command_circuit_breaker
     async def file_exists(self, container_name: str, blob_name: str) -> bool:
         """Check if file exists in storage."""
         blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=blob_name)
         return await blob_client.exists()
 
+    @command_circuit_breaker
     async def delete_file(self, container_name: str, blob_name: str) -> None:
         """Delete file from storage."""
         blob_client = self.blob_service_client.get_blob_client(container=container_name, blob=blob_name)

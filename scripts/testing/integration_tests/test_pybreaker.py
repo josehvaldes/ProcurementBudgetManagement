@@ -2,8 +2,24 @@ import pybreaker
 import requests
 import time
 
+class BreakerListener(pybreaker.CircuitBreakerListener):
+    """Listener to log circuit breaker state changes."""
 
-breaker = pybreaker.CircuitBreaker(fail_max=3, reset_timeout=8)
+    def state_change(self, cb, old_state, new_state):
+        print(f" * Circuit breaker '{cb.name}' state changed: {old_state.name} → {new_state.name}")
+
+    def failure(self, cb, exc):
+        print(f" * Circuit breaker '{cb.name}' recorded failure: {exc}")
+
+    def success(self, cb):
+        print(f" * Circuit breaker '{cb.name}' recorded success")
+
+
+breaker = pybreaker.CircuitBreaker(fail_max=3, 
+                                   reset_timeout=8, 
+                                   listeners=[BreakerListener()],
+                                   name="unreliable-service-breaker"
+                                   )
 
 @breaker
 def call_unreliable_service():
