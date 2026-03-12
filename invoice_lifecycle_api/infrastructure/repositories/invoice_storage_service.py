@@ -1,7 +1,10 @@
 
 import io
 from azure.storage.blob.aio import BlobServiceClient
+from azure.core.exceptions import ServiceResponseError
 import pybreaker
+import random
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 from shared.config.settings import settings
 from shared.utils.logging_config import get_logger
 from invoice_lifecycle_api.infrastructure.azure_credential_manager import get_credential_manager
@@ -72,6 +75,11 @@ class InvoiceStorageService(StorageServiceInterface):
         """Upload file to storage and return the file URL."""
         pass
 
+    @retry(
+            stop=stop_after_attempt(3), 
+            wait=wait_fixed(2), 
+            retry=retry_if_exception_type((ServiceResponseError))
+        )
     @download_circuit_breaker
     async def download_file(self,  container_name:str, blob_name: str) -> bytes:
         """Download file from storage"""
